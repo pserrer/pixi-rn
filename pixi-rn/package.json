@@ -1,0 +1,31 @@
+{
+  "name": "pixi-rn",
+  "version": "0.1.0",
+  "description": "pixi.js v8 inside React Native on expo-gl: renderer bring-up, texture upload, bitmap text, a frame loop, and a seam that keeps RN's layout and input while pixi draws.",
+  "license": "MIT",
+  "private": false,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "testing",
+    "README.md"
+  ],
+  "keywords": [
+    "pixi",
+    "pixijs",
+    "react-native",
+    "expo",
+    "expo-gl",
+    "webgl",
+    "game",
+    "ui"
+  ],
+  "peerDependencies": {
+    "expo-asset": "*",
+    "expo-gl": "*",
+    "pixi.js": "^8.0.0",
+    "react": "*",
+    "react-native": "*"
+  }
+}
