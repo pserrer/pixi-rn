@@ -23,24 +23,13 @@
 // `WebGLRenderer` is created. It installs Pixi's interpreter-based uniform /
 // shader sync implementations instead of runtime code generation.
 import 'pixi.js/unsafe-eval';
-import { DOMAdapter, DOMPipe, extensions, EventSystem, type Adapter } from 'pixi.js';
+import { DOMAdapter, DOMPipe, extensions, type Adapter } from 'pixi.js';
 import type { ICanvas } from 'pixi.js';
 
-// Ask pixi not to use its DOM event system (input here is RN's responder
-// system) or v8's DOMPipe (the pipe behind `DOMContainer`, which nothing here
-// uses). Both are pure overhead in this runtime and both reach for a DOM:
-// EventSystem grabs `document`/`globalThis.addEventListener`, DOMPipe does
-// `document.createElement('div')` in its constructor and calls `.remove()` on
-// it after every frame.
-//
-// ⚠️ These calls are a REQUEST, not a guarantee. Verified with `npm run
-// glsmoke`: in v8 both systems are still constructed afterwards (EventSystem
-// gets as far as registering `EventsTicker`, and `renderer.renderPipes.dom`
-// exists). So nothing downstream may ASSUME they are gone — the DOM surface
-// below has to stay complete enough for them to run harmlessly, and
-// renderer.ts kills the shared tickers rather than trusting that no library
-// singleton is on them.
-extensions.remove(EventSystem);
+// DOMPipe is not useful on React Native and creates DOM elements during every
+// render. Keep Pixi's v8 EventSystem: `events.ts` feeds its federated boundary
+// with native surface input, preserving normal eventMode/hit-test semantics.
+// The DOM shim below still makes its passive browser hooks harmless.
 extensions.remove(DOMPipe);
 
 // Minimal fake <canvas>: enough surface for anything that only sizes/observes

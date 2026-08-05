@@ -5,8 +5,10 @@
 // their own import order. Everything else in the package imports './adapter'
 // too, but bundlers do not promise module-eval order across entry points.
 import './adapter';
+import './layout';
 
 export { fakeCanvas, pixiEnvReady } from './adapter';
+export { pixiLayoutReady } from './layout';
 export { setPixiRnLogger, type PixiRnLogger } from './log';
 
 // The single frame loop: rAF, dt clamping, present, and error containment.
@@ -44,3 +46,14 @@ export { createUiChromeLayer, type UiChromeLayer, type ChromeTextures } from './
 
 export { PixelText } from './PixelText';
 export { parseColor } from './color';
+
+// Native surface input → Pixi v8 federated events.
+export { createNativeEventBridge, type NativeEventBridge, type NativePointerInput, type NativePointerType } from './events';
+
+// Generic retained UI primitives. These are Expo-safe: no Graphics, Text, or
+// canvas-backed Texture.WHITE.
+export {
+  createUiRect, UiButton, UiImage, UiLabel, UiPanel, UiSlider,
+  type UiRectOptions, type UiImageOptions, type UiLabelOptions,
+  type UiPanelOptions, type UiButtonOptions, type UiSliderOptions,
+} from './ui';

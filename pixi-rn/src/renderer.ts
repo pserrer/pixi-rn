@@ -140,8 +140,9 @@ export async function createRenderer(gl: GLLike, options: RendererOptions): Prom
       // for a GC pass to reclaim anyway; leaving it enabled would only let pixi
       // unload sheets mid-run and re-upload them.
       gcActive: false,
-      // No event options: the EventSystem extension is removed outright in
-      // adapter.ts (input is RN's responder system).
+      // EventSystem stays installed. pixi-rn feeds its EventBoundary from the
+      // native surface; browser listeners attached to the inert canvas do no
+      // work in this environment.
     });
     // Belt and braces for the note above: if anything managed to start one
     // before `autoStart` was cleared, stop it now. Nothing is lost — with
