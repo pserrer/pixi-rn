@@ -55,8 +55,12 @@ class ExpoCanvas implements ICanvas {
 
   addEventListener(): void {}
   removeEventListener(): void {}
-  dispatchEvent(): boolean { return true; }
-  getContext(): null { return null; }
+  dispatchEvent(): boolean {
+    return true;
+  }
+  getContext(): null {
+    return null;
+  }
   // Element-shaped no-ops. Nothing here is in a document, but pixi calls these
   // on elements it created, and a missing method is a TypeError inside a rAF
   // callback — i.e. a dead process with no attributable stack. Not theoretical:
@@ -65,14 +69,29 @@ class ExpoCanvas implements ICanvas {
   // Report the real surface box so it computes an identity transform and
   // settles, rather than throwing.
   remove(): void {}
-  appendChild<T>(child: T): T { return child; }
-  removeChild<T>(child: T): T { return child; }
-  contains(): boolean { return false; }
+  appendChild<T>(child: T): T {
+    return child;
+  }
+  removeChild<T>(child: T): T {
+    return child;
+  }
+  contains(): boolean {
+    return false;
+  }
   getBoundingClientRect(): DOMRect {
     const { width, height } = this;
     return {
-      x: 0, y: 0, top: 0, left: 0, right: width, bottom: height, width, height,
-      toJSON() { return this; },
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: width,
+      bottom: height,
+      width,
+      height,
+      toJSON() {
+        return this;
+      },
     } as DOMRect;
   }
 }
@@ -169,7 +188,9 @@ function getWebGLRenderingContextClass(): WebGL1Constructor {
 
 const expoAdapter: Adapter = {
   createCanvas: (width?: number, height?: number) => fakeCanvas(width, height),
-  createImage: () => { throw new Error('Images are loaded through ExpoAssetSource'); },
+  createImage: () => {
+    throw new Error('Images are loaded through ExpoAssetSource');
+  },
   getCanvasRenderingContext2D: () => null as unknown as { prototype: CanvasRenderingContext2D },
   getWebGLRenderingContext: getWebGLRenderingContextClass,
   getNavigator: () => ({ userAgent: 'ReactNative', gpu: null }),

@@ -106,9 +106,14 @@ export interface UiLabelOptions extends BitmapTextOptions {
 }
 
 const OUTLINE_DIRECTIONS: readonly (readonly [number, number])[] = [
-  [-1, -1], [0, -1], [1, -1],
-  [-1, 0], [1, 0],
-  [-1, 1], [0, 1], [1, 1],
+  [-1, -1],
+  [0, -1],
+  [1, -1],
+  [-1, 0],
+  [1, 0],
+  [-1, 1],
+  [0, 1],
+  [1, 1],
 ];
 
 /** Bitmap-font label with an optional pixel outline made from retained glyph runs. */
@@ -125,11 +130,11 @@ export class UiLabel extends Container {
     this.outlineWidth = options.outline?.width ?? 1;
     this.outlines = options.outline
       ? OUTLINE_DIRECTIONS.map(([x, y]) => {
-        const label = createBitmapText(text, { ...options, tint: options.outline?.color });
-        label.position.set(x * this.outlineWidth, y * this.outlineWidth);
-        this.addChild(label);
-        return label;
-      })
+          const label = createBitmapText(text, { ...options, tint: options.outline?.color });
+          label.position.set(x * this.outlineWidth, y * this.outlineWidth);
+          this.addChild(label);
+          return label;
+        })
       : [];
     this.foreground = createBitmapText(text, options);
     this.addChild(this.foreground);
@@ -300,7 +305,9 @@ export class UiSlider extends Container {
     return this;
   }
 
-  getValue(): number { return this.value; }
+  getValue(): number {
+    return this.value;
+  }
 
   setOnValueChange(onValueChange: ((value: number) => void) | undefined): this {
     this.onValueChange = onValueChange;

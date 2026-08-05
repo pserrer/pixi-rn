@@ -18,7 +18,14 @@
 // compatibility layers before Pixi classes are evaluated.
 import './adapter';
 import { BitmapText, Container, NineSliceSprite, Sprite, Texture, Rectangle } from 'pixi.js';
-import { chromeCommands, chromeScroll, chromeSurfaceOrigin, tickChromeSweep, type ChromeCmd, type UiTexKey } from './chrome';
+import {
+  chromeCommands,
+  chromeScroll,
+  chromeSurfaceOrigin,
+  tickChromeSweep,
+  type ChromeCmd,
+  type UiTexKey,
+} from './chrome';
 import { createBitmapText, measureText } from './bitmapFont';
 
 /** Resolves a command's `tex` key to an uploaded texture, or null while the
@@ -29,25 +36,41 @@ export type ChromeTextures = (key: UiTexKey) => Texture | null | undefined;
 // native <Text> copies. Here they are 8 more glyph runs in the same batch, so
 // the outline costs quads instead of views.
 const OUTLINE_DIRS: readonly (readonly [number, number])[] = [
-  [-1, -1], [0, -1], [1, -1],
-  [-1, 0], [1, 0],
-  [-1, 1], [0, 1], [1, 1],
+  [-1, -1],
+  [0, -1],
+  [1, -1],
+  [-1, 0],
+  [1, 0],
+  [-1, 1],
+  [0, 1],
+  [1, 1],
 ];
 
 /** Grows on demand, hides the tail — the usual pool shape in this renderer. */
 class Pool<T extends Container> {
   private items: T[] = [];
   private used = 0;
-  constructor(private readonly root: Container, private readonly make: () => T) {}
+  constructor(
+    private readonly root: Container,
+    private readonly make: () => T,
+  ) {}
   next(): T {
     let it = this.items[this.used];
-    if (!it) { it = this.make(); this.items.push(it); this.root.addChild(it); }
+    if (!it) {
+      it = this.make();
+      this.items.push(it);
+      this.root.addChild(it);
+    }
     it.visible = true;
     this.used++;
     return it;
   }
-  reset() { this.used = 0; }
-  hideRest() { for (let i = this.used; i < this.items.length; i++) this.items[i].visible = false; }
+  reset() {
+    this.used = 0;
+  }
+  hideRest() {
+    for (let i = this.used; i < this.items.length; i++) this.items[i].visible = false;
+  }
 }
 
 // ⚠️ POOLS DO NOT DEFINE PAINT ORDER — `zIndex` does, and every drawn item must
@@ -80,7 +103,10 @@ export function createUiChromeLayer(white: Texture, textures: ChromeTextures): U
 
   const rects = new Pool<Sprite>(root, () => new Sprite(white));
   const images = new Pool<Sprite>(root, () => new Sprite(Texture.EMPTY));
-  const nines = new Pool<NineSliceSprite>(root, () => new NineSliceSprite({ texture: Texture.EMPTY, leftWidth: 1, topHeight: 1, rightWidth: 1, bottomHeight: 1 }));
+  const nines = new Pool<NineSliceSprite>(
+    root,
+    () => new NineSliceSprite({ texture: Texture.EMPTY, leftWidth: 1, topHeight: 1, rightWidth: 1, bottomHeight: 1 }),
+  );
   // Up to 9 runs per label (8 outline + 1 foreground). Pool slots are handed
   // out in command order, which is stable (uiChrome's Map preserves insertion
   // order), so a given slot keeps getting the same string frame after frame and
@@ -94,13 +120,19 @@ export function createUiChromeLayer(white: Texture, textures: ChromeTextures): U
   const fullCache = new Map<Texture, Texture>();
   function whole(base: Texture): Texture {
     let t = fullCache.get(base);
-    if (!t) { t = base; fullCache.set(base, t); }
+    if (!t) {
+      t = base;
+      fullCache.set(base, t);
+    }
     return t;
   }
   function cropped(base: Texture, sx: number, sy: number, sw: number, sh: number): Texture {
     const key = `${base.uid}|${sx},${sy},${sw},${sh}`;
     let t = cropCache.get(key);
-    if (!t) { t = new Texture({ source: base.source, frame: new Rectangle(sx, sy, sw, sh) }); cropCache.set(key, t); }
+    if (!t) {
+      t = new Texture({ source: base.source, frame: new Rectangle(sx, sy, sw, sh) });
+      cropCache.set(key, t);
+    }
     return t;
   }
 
@@ -109,8 +141,10 @@ export function createUiChromeLayer(white: Texture, textures: ChromeTextures): U
     const s = rects.next();
     s.zIndex = paintOrder++;
     s.position.set(x, y);
-    s.width = w; s.height = h;
-    s.tint = color; s.alpha = alpha;
+    s.width = w;
+    s.height = h;
+    s.tint = color;
+    s.alpha = alpha;
   }
 
   // The pixel-stair silhouette as axis-aligned rects: a tall middle band, a
@@ -174,17 +208,19 @@ export function createUiChromeLayer(white: Texture, textures: ChromeTextures): U
    * cut without distorting, so they are drawn only while fully inside — the
    * row's card and label appear together as it clears the edge.
    */
-  function drawClipped(
-    c: ChromeCmd,
-    tex: ChromeTextures,
-    v: { x: number; y: number; w: number; h: number } | null,
-  ) {
-    if (!v) { draw(c, tex); return; }
+  function drawClipped(c: ChromeCmd, tex: ChromeTextures, v: { x: number; y: number; w: number; h: number } | null) {
+    if (!v) {
+      draw(c, tex);
+      return;
+    }
     const top = Math.max(c.y, v.y);
     const bottom = Math.min(c.y + c.h, v.y + v.h);
     if (bottom <= top) return;
     const fullyInside = top === c.y && bottom === c.y + c.h;
-    if (fullyInside) { draw(c, tex); return; }
+    if (fullyInside) {
+      draw(c, tex);
+      return;
+    }
 
     if (c.kind === 'rect' || c.kind === 'stair') {
       draw({ ...c, y: top, h: bottom - top }, tex);
@@ -194,17 +230,20 @@ export function createUiChromeLayer(white: Texture, textures: ChromeTextures): U
       const cutTop = (top - c.y) / c.h;
       const cutBottom = (c.y + c.h - bottom) / c.h;
       const crop = c.crop;
-      draw({
-        ...c,
-        y: top,
-        h: bottom - top,
-        crop: crop && {
-          sx: crop.sx,
-          sy: crop.sy + crop.sh * cutTop,
-          sw: crop.sw,
-          sh: crop.sh * (1 - cutTop - cutBottom),
+      draw(
+        {
+          ...c,
+          y: top,
+          h: bottom - top,
+          crop: crop && {
+            sx: crop.sx,
+            sy: crop.sy + crop.sh * cutTop,
+            sw: crop.sw,
+            sh: crop.sh * (1 - cutTop - cutBottom),
+          },
         },
-      }, tex);
+        tex,
+      );
       return;
     }
     // nine / text: all-or-nothing at the edge.
@@ -221,9 +260,8 @@ export function createUiChromeLayer(white: Texture, textures: ChromeTextures): U
       // the SAME measurement PixelText sized its View with, so a centred label
       // lands exactly where RN would have put it.
       const { width } = measureText(text, c.size, spacing);
-      const x = c.align === 'center' ? c.x + Math.round((c.w - width) / 2)
-        : c.align === 'right' ? c.x + (c.w - width)
-          : c.x;
+      const x =
+        c.align === 'center' ? c.x + Math.round((c.w - width) / 2) : c.align === 'right' ? c.x + (c.w - width) : c.x;
       // Top-aligned, like a native <Text> in a box sized to its content.
       const ow = c.outlineWidth ?? 0;
       if (ow > 0 && c.outline !== undefined) {
@@ -263,7 +301,8 @@ export function createUiChromeLayer(white: Texture, textures: ChromeTextures): U
       // NineSliceSprite's width/height directly set the destination size. A
       // separate scale would distort the nine-slice mesh and its preserved edges.
       n.scale.set(1);
-      n.width = c.w; n.height = c.h;
+      n.width = c.w;
+      n.height = c.h;
       n.position.set(c.x, c.y);
       n.alpha = c.alpha ?? 1;
       return;
@@ -272,7 +311,8 @@ export function createUiChromeLayer(white: Texture, textures: ChromeTextures): U
     s.zIndex = paintOrder++;
     s.texture = c.crop ? cropped(base, c.crop.sx, c.crop.sy, c.crop.sw, c.crop.sh) : whole(base);
     s.position.set(c.x, c.y);
-    s.width = c.w; s.height = c.h;
+    s.width = c.w;
+    s.height = c.h;
     s.tint = c.tint ?? 0xffffff;
     s.alpha = c.alpha ?? 1;
   }
@@ -280,7 +320,10 @@ export function createUiChromeLayer(white: Texture, textures: ChromeTextures): U
   return {
     root,
     update() {
-      rects.reset(); images.reset(); nines.reset(); texts.reset();
+      rects.reset();
+      images.reset();
+      nines.reset();
+      texts.reset();
       paintOrder = 0;
       const tex = textures;
       // chromeCommands() is already in paint order: shallowest first, then by
@@ -296,15 +339,22 @@ export function createUiChromeLayer(white: Texture, textures: ChromeTextures): U
         const origin = chromeSurfaceOrigin();
         for (const entry of chromeCommands()) {
           const { scrollId, baseScrollY } = entry;
-          const cmd = origin.x === 0 && origin.y === 0
-            ? entry.cmd
-            : { ...entry.cmd, x: entry.cmd.x - origin.x, y: entry.cmd.y - origin.y };
-          if (!scrollId) { draw(cmd, tex); continue; }
+          const cmd =
+            origin.x === 0 && origin.y === 0
+              ? entry.cmd
+              : { ...entry.cmd, x: entry.cmd.x - origin.x, y: entry.cmd.y - origin.y };
+          if (!scrollId) {
+            draw(cmd, tex);
+            continue;
+          }
           // Inside a scroller: shift by how far it has scrolled SINCE this box
           // was measured, and clip to the scroller's own viewport so rows never
           // draw outside the panel that frames them.
           const region = chromeScroll(scrollId);
-          if (!region) { draw(cmd, tex); continue; }
+          if (!region) {
+            draw(cmd, tex);
+            continue;
+          }
           const dy = region.y - baseScrollY;
           const view = region.view;
           const shifted = shift(cmd, -dy);
@@ -315,7 +365,10 @@ export function createUiChromeLayer(white: Texture, textures: ChromeTextures): U
       // One element re-measures per frame, round-robin — the backstop for
       // every screen-mover nobody enumerated (see uiChrome.ts).
       tickChromeSweep();
-      rects.hideRest(); images.hideRest(); nines.hideRest(); texts.hideRest();
+      rects.hideRest();
+      images.hideRest();
+      nines.hideRest();
+      texts.hideRest();
     },
   };
 }

@@ -31,8 +31,16 @@ import { pixiRnFail, pixiRnTrace } from './log';
 /** The BMFont JSON shape emitted by a bitmap-font baker (see the game's
  *  scripts/gen-bitmap-font.mjs for one that keeps pixel glyphs crisp). */
 export type GeneratedBitmapGlyph = {
-  id: number; char: string; page: number; x: number; y: number;
-  width: number; height: number; xoffset: number; yoffset: number; xadvance: number;
+  id: number;
+  char: string;
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  xoffset: number;
+  yoffset: number;
+  xadvance: number;
 };
 export type GeneratedBitmapFont = {
   pages: string[];
@@ -57,12 +65,19 @@ function raw(): GeneratedBitmapFont {
 }
 
 /** The size the atlas was baked at — text at this size is 1:1 with its pixels. */
-export function fontBaseSize(): number { return raw().info.size; }
+export function fontBaseSize(): number {
+  return raw().info.size;
+}
 
 /** The installed font's family name, for BitmapText styles. */
-export function fontFamily(): string { return fontName; }
+export function fontFamily(): string {
+  return fontName;
+}
 
-export interface TextMetrics { width: number; height: number }
+export interface TextMetrics {
+  width: number;
+  height: number;
+}
 
 /**
  * Measure a string in the bitmap font, synchronously, with no native call.
@@ -88,7 +103,10 @@ export function measureText(text: string, fontSize: number, letterSpacing = 0): 
   for (const line of lines) {
     let advance = 0;
     let count = 0;
-    for (const char of line) { advance += ADVANCE.get(char) ?? FALLBACK_ADVANCE; count++; }
+    for (const char of line) {
+      advance += ADVANCE.get(char) ?? FALLBACK_ADVANCE;
+      count++;
+    }
     const width = advance * scale + letterSpacing * count;
     if (width > widest) widest = width;
   }
@@ -105,19 +123,24 @@ export function measureText(text: string, fontSize: number, letterSpacing = 0): 
 export function installBitmapFont(atlas: Texture, raw: GeneratedBitmapFont): BitmapFont {
   const data: BitmapFontData = {
     pages: raw.pages.map((file: string, id: number) => ({ id, file })),
-    chars: Object.fromEntries(raw.chars.map((c) => [c.char, {
-      id: c.id,
-      page: c.page,
-      x: c.x,
-      y: c.y,
-      width: c.width,
-      height: c.height,
-      xOffset: c.xoffset,
-      yOffset: c.yoffset,
-      xAdvance: c.xadvance,
-      letter: c.char,
-      kerning: {},
-    }])),
+    chars: Object.fromEntries(
+      raw.chars.map((c) => [
+        c.char,
+        {
+          id: c.id,
+          page: c.page,
+          x: c.x,
+          y: c.y,
+          width: c.width,
+          height: c.height,
+          xOffset: c.xoffset,
+          yOffset: c.yoffset,
+          xAdvance: c.xadvance,
+          letter: c.char,
+          kerning: {},
+        },
+      ]),
+    ),
     fontSize: raw.info.size,
     lineHeight: raw.common.lineHeight,
     baseLineOffset: raw.common.base,
@@ -168,7 +191,7 @@ export function createBitmapText(text: string, opts: BitmapTextOptions = {}): Bi
     text,
     style: {
       fontFamily: fontName,
-      fontSize: opts.fontSize ?? (RAW?.info.size ?? 16),
+      fontSize: opts.fontSize ?? RAW?.info.size ?? 16,
       align: opts.align ?? 'left',
       letterSpacing: opts.letterSpacing ?? 0,
     },

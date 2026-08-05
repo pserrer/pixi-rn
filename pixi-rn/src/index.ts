@@ -23,23 +23,47 @@ export { ExpoAssetSource, loadSheet, makeWhiteTexture, makeSlicer } from './text
 // Bitmap font: the only text pixi can draw here, and the only text that can be
 // measured synchronously in JS — which is what lets RN keep the layout.
 export {
-  installBitmapFont, loadBitmapFont, createBitmapText, measureText,
-  fontBaseSize, fontFamily,
-  type GeneratedBitmapFont, type GeneratedBitmapGlyph, type TextMetrics, type BitmapTextOptions,
+  installBitmapFont,
+  loadBitmapFont,
+  createBitmapText,
+  measureText,
+  fontBaseSize,
+  fontFamily,
+  type GeneratedBitmapFont,
+  type GeneratedBitmapGlyph,
+  type TextMetrics,
+  type BitmapTextOptions,
 } from './bitmapFont';
 
 // The seam: RN publishes what to draw and where, pixi draws it in its own frame.
 export {
-  newChromeId, setChrome, clearChrome, chromeCommands, chromeCount,
-  newChromeScrollId, setChromeScroll, setChromeScrollViewport, clearChromeScroll, chromeScroll,
-  registerChromeMeasure, tickChromeSweep,
-  setChromeSurfaceOrigin, chromeSurfaceOrigin,
-  type ChromeCmd, type ChromeEntry, type SrcCrop, type UiTexKey,
+  newChromeId,
+  setChrome,
+  clearChrome,
+  chromeCommands,
+  chromeCount,
+  newChromeScrollId,
+  setChromeScroll,
+  setChromeScrollViewport,
+  clearChromeScroll,
+  chromeScroll,
+  registerChromeMeasure,
+  tickChromeSweep,
+  setChromeSurfaceOrigin,
+  chromeSurfaceOrigin,
+  type ChromeCmd,
+  type ChromeEntry,
+  type SrcCrop,
+  type UiTexKey,
 } from './chrome';
 
 export {
-  useChrome, useChromeScrollRegion, ChromeDepthProvider, bumpChromeLayout,
-  type ChromeSpec, type ChromeBinding,
+  useChrome,
+  useChromeScrollRegion,
+  ChromeDepthProvider,
+  bumpChromeLayout,
+  type ChromeSpec,
+  type ChromeBinding,
 } from './useChrome';
 
 export { createUiChromeLayer, type UiChromeLayer, type ChromeTextures } from './chromeLayer';
@@ -48,12 +72,27 @@ export { PixelText } from './PixelText';
 export { parseColor } from './color';
 
 // Native surface input → Pixi v8 federated events.
-export { createNativeEventBridge, type NativeEventBridge, type NativePointerInput, type NativePointerType } from './events';
+export {
+  createNativeEventBridge,
+  type NativeEventBridge,
+  type NativePointerInput,
+  type NativePointerType,
+} from './events';
 
 // Generic retained UI primitives. These are Expo-safe: no Graphics, Text, or
 // canvas-backed Texture.WHITE.
 export {
-  createUiLayout, createUiRect, UiButton, UiImage, UiLabel, UiPanel, UiSlider,
-  type UiRectOptions, type UiImageOptions, type UiLabelOptions,
-  type UiPanelOptions, type UiButtonOptions, type UiSliderOptions,
+  createUiLayout,
+  createUiRect,
+  UiButton,
+  UiImage,
+  UiLabel,
+  UiPanel,
+  UiSlider,
+  type UiRectOptions,
+  type UiImageOptions,
+  type UiLabelOptions,
+  type UiPanelOptions,
+  type UiButtonOptions,
+  type UiSliderOptions,
 } from './ui';

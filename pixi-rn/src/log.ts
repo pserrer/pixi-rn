@@ -22,5 +22,9 @@ export function setPixiRnLogger(next: Partial<PixiRnLogger>): void {
   logger = { ...logger, ...next };
 }
 
-export function pixiRnTrace(stage: string, detail?: unknown): void { logger.trace(stage, detail); }
-export function pixiRnFail(stage: string, error: unknown): void { logger.fail(stage, error); }
+export function pixiRnTrace(stage: string, detail?: unknown): void {
+  logger.trace(stage, detail);
+}
+export function pixiRnFail(stage: string, error: unknown): void {
+  logger.fail(stage, error);
+}

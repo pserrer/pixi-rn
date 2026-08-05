@@ -53,7 +53,9 @@ export function startFrameLoop(options: FrameLoopOptions): () => void {
 
   const tick = (now: number) => {
     let currentStage = 'begin';
-    const stage: FrameStage = (label) => { currentStage = label; };
+    const stage: FrameStage = (label) => {
+      currentStage = label;
+    };
     try {
       const rawMs = last ? now - last : 1000 / 60;
       // First frame has no previous timestamp, so assume a nominal one rather
@@ -77,7 +79,7 @@ export function startFrameLoop(options: FrameLoopOptions): () => void {
     } catch (e: unknown) {
       const error = e instanceof Error ? e : new Error(String(e));
       onError?.(error, currentStage);
-      return;                       // stop: see the header note
+      return; // stop: see the header note
     }
     if (!stopped) raf = requestAnimationFrame(tick);
   };

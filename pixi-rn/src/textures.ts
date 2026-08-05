@@ -11,7 +11,15 @@
 // one draw per layer, mirroring what Skia's <Atlas> did.
 
 import './adapter';
-import { BufferImageSource, Rectangle, Texture, TextureSource, extensions, type GlTexture, type GlRenderingContext } from 'pixi.js';
+import {
+  BufferImageSource,
+  Rectangle,
+  Texture,
+  TextureSource,
+  extensions,
+  type GlTexture,
+  type GlRenderingContext,
+} from 'pixi.js';
 import { Asset } from 'expo-asset';
 import { pixiRnFail, pixiRnTrace } from './log';
 
@@ -21,22 +29,47 @@ export class ExpoAssetSource extends TextureSource<Asset> {
   uploadMethodId = 'expo-asset';
 
   constructor(asset: Asset) {
-    super({ resource: asset, width: asset.width ?? 0, height: asset.height ?? 0, scaleMode: 'nearest', alphaMode: 'no-premultiply-alpha' });
+    super({
+      resource: asset,
+      width: asset.width ?? 0,
+      height: asset.height ?? 0,
+      scaleMode: 'nearest',
+      alphaMode: 'no-premultiply-alpha',
+    });
   }
 }
 
 type ExpoAssetTextureUploader = {
   extension: { type: 'texture-uploader-webgl'; name: 'expo-asset' };
   id: 'expo-asset';
-  upload: (source: ExpoAssetSource, glTexture: GlTexture, gl: GlRenderingContext, version: number, targetOverride?: number) => void;
+  upload: (
+    source: ExpoAssetSource,
+    glTexture: GlTexture,
+    gl: GlRenderingContext,
+    version: number,
+    targetOverride?: number,
+  ) => void;
 };
 
 const expoAssetUploader: ExpoAssetTextureUploader = {
   extension: { type: 'texture-uploader-webgl', name: 'expo-asset' },
   id: 'expo-asset',
-  upload(source: ExpoAssetSource, glTexture: GlTexture, gl: GlRenderingContext, _version: number, targetOverride?: number) {
+  upload(
+    source: ExpoAssetSource,
+    glTexture: GlTexture,
+    gl: GlRenderingContext,
+    _version: number,
+    targetOverride?: number,
+  ) {
     const target = targetOverride ?? glTexture.target;
-    gl.texImage2D(glTexture.target, 0, glTexture.internalFormat, glTexture.format, glTexture.type, source.resource as unknown as TexImageSource);
+    gl.texImage2D(
+      glTexture.target,
+      0,
+      glTexture.internalFormat,
+      glTexture.format,
+      glTexture.type,
+      source.resource as unknown as TexImageSource,
+    );
     glTexture.width = source.pixelWidth;
     glTexture.height = source.pixelHeight;
   },
@@ -71,7 +104,15 @@ export async function loadSheet(label: string, mod: number): Promise<Texture> {
 // NOT Texture.WHITE: that lazily rasterizes a 2D canvas, which doesn't exist
 // here (see adapter.ts).
 export function makeWhiteTexture(): Texture {
-  return new Texture({ source: new BufferImageSource({ resource: new Uint8Array([255, 255, 255, 255]), width: 1, height: 1, scaleMode: 'nearest', alphaMode: 'no-premultiply-alpha' }) });
+  return new Texture({
+    source: new BufferImageSource({
+      resource: new Uint8Array([255, 255, 255, 255]),
+      width: 1,
+      height: 1,
+      scaleMode: 'nearest',
+      alphaMode: 'no-premultiply-alpha',
+    }),
+  });
 }
 
 /** Sub-rect of a sheet, cached by rect OBJECT IDENTITY — pass shared instances,
@@ -80,7 +121,10 @@ export function makeSlicer(): (base: Texture, src: { x: number; y: number; w: nu
   const cache = new Map<Texture, Map<object, Texture>>();
   return (base, src) => {
     let inner = cache.get(base);
-    if (!inner) { inner = new Map(); cache.set(base, inner); }
+    if (!inner) {
+      inner = new Map();
+      cache.set(base, inner);
+    }
     let tex = inner.get(src);
     if (!tex) {
       tex = new Texture({ source: base.source, frame: new Rectangle(src.x, src.y, src.w, src.h) });

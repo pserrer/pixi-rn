@@ -30,7 +30,11 @@ import { useChrome } from './useChrome';
 function luminance(color: string): number {
   let hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color)?.[1];
   if (!hex) return -1;
-  if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('');
+  if (hex.length === 3)
+    hex = hex
+      .split('')
+      .map((c) => c + c)
+      .join('');
   const n = parseInt(hex, 16);
   return 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 0xff) + 0.114 * (n & 0xff);
 }
@@ -40,11 +44,27 @@ function luminance(color: string): number {
 // in `style` is layout — margins, alignSelf, flex — and is passed straight
 // through, which is what makes this a drop-in for a <Text> in the same slot.
 const TEXT_ONLY_KEYS = [
-  'fontSize', 'letterSpacing', 'fontFamily', 'fontWeight', 'fontStyle', 'fontVariant',
-  'color', 'textAlign', 'textAlignVertical', 'lineHeight', 'textTransform',
-  'textDecorationLine', 'textDecorationColor', 'textDecorationStyle',
-  'textShadowColor', 'textShadowOffset', 'textShadowRadius', 'includeFontPadding',
-  'writingDirection', 'userSelect', 'verticalAlign',
+  'fontSize',
+  'letterSpacing',
+  'fontFamily',
+  'fontWeight',
+  'fontStyle',
+  'fontVariant',
+  'color',
+  'textAlign',
+  'textAlignVertical',
+  'lineHeight',
+  'textTransform',
+  'textDecorationLine',
+  'textDecorationColor',
+  'textDecorationStyle',
+  'textShadowColor',
+  'textShadowOffset',
+  'textShadowRadius',
+  'includeFontPadding',
+  'writingDirection',
+  'userSelect',
+  'verticalAlign',
 ] as const;
 
 interface Props {
@@ -64,9 +84,7 @@ interface Props {
   numberOfLines?: number;
 }
 
-export function PixelText({
-  text, color, style, outline, outlineWidth = 1, containerStyle, numberOfLines,
-}: Props) {
+export function PixelText({ text, color, style, outline, outlineWidth = 1, containerStyle, numberOfLines }: Props) {
   const flat = StyleSheet.flatten<TextStyle>(style) ?? {};
   const size = typeof flat.fontSize === 'number' ? flat.fontSize : fontBaseSize();
   const letterSpacing = typeof flat.letterSpacing === 'number' ? flat.letterSpacing : 0;
@@ -92,7 +110,10 @@ export function PixelText({
     (x, y, w, h): ChromeCmd => ({
       kind: 'text',
       text,
-      x, y, w, h,
+      x,
+      y,
+      w,
+      h,
       size,
       color: fg.rgb,
       outline: outlineWidth > 0 ? oc.rgb : undefined,
@@ -113,11 +134,7 @@ export function PixelText({
       // be measured (same reason every other chrome component does this).
       collapsable={false}
       pointerEvents="none"
-      style={[
-        { width: metrics.width, height: metrics.height },
-        layoutStyle,
-        containerStyle,
-      ]}
+      style={[{ width: metrics.width, height: metrics.height }, layoutStyle, containerStyle]}
     />
   );
 }

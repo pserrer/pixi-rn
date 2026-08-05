@@ -31,11 +31,9 @@ function describeGlCapabilities(gl: GLLike): string {
   } catch {
     extensions = 'query-failed';
   }
-  return [
-    `webgl2=${String(gl.supportsWebGL2)}`,
-    `ctor=${gl.constructor?.name ?? 'unknown'}`,
-    `ext=${extensions}`,
-  ].join(' | ');
+  return [`webgl2=${String(gl.supportsWebGL2)}`, `ctor=${gl.constructor?.name ?? 'unknown'}`, `ext=${extensions}`].join(
+    ' | ',
+  );
 }
 
 export interface RendererOptions {
@@ -61,7 +59,9 @@ export async function createRenderer(gl: GLLike, options: RendererOptions): Prom
     style: {},
     addEventListener() {},
     removeEventListener() {},
-    dispatchEvent() { return true; },
+    dispatchEvent() {
+      return true;
+    },
     getContext: (() => gl) as unknown as ICanvas['getContext'],
   };
 

@@ -11,7 +11,13 @@ export function parseColor(css: string): { rgb: number; alpha: number } {
   let out = { rgb: 0x000000, alpha: 1 };
   if (css.startsWith('#')) {
     const h = css.slice(1);
-    const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+    const full =
+      h.length === 3
+        ? h
+            .split('')
+            .map((c) => c + c)
+            .join('')
+        : h;
     out = { rgb: parseInt(full.slice(0, 6), 16), alpha: full.length >= 8 ? parseInt(full.slice(6, 8), 16) / 255 : 1 };
   } else {
     const m = css.match(/rgba?\(([^)]+)\)/);

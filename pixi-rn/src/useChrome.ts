@@ -15,8 +15,15 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef } from 'react';
 import type { LayoutChangeEvent, View } from 'react-native';
 import {
-  clearChrome, newChromeId, newChromeScrollId, registerChromeMeasure, setChrome,
-  setChromeScroll, setChromeScrollViewport, clearChromeScroll, chromeScroll,
+  clearChrome,
+  newChromeId,
+  newChromeScrollId,
+  registerChromeMeasure,
+  setChrome,
+  setChromeScroll,
+  setChromeScrollViewport,
+  clearChromeScroll,
+  chromeScroll,
   type ChromeCmd,
 } from './chrome';
 
@@ -81,9 +88,12 @@ export function useChromeScrollRegion(): {
 
   useEffect(() => () => clearChromeScroll(scrollId), [scrollId]);
 
-  const onScroll = useCallback((e: { nativeEvent: { contentOffset: { y: number } } }) => {
-    setChromeScroll(scrollId, e.nativeEvent.contentOffset.y);
-  }, [scrollId]);
+  const onScroll = useCallback(
+    (e: { nativeEvent: { contentOffset: { y: number } } }) => {
+      setChromeScroll(scrollId, e.nativeEvent.contentOffset.y);
+    },
+    [scrollId],
+  );
 
   // The viewport is what chrome gets clipped to, so it has to be the SCROLLER's
   // own box in screen coords, not the content's.
@@ -94,8 +104,11 @@ export function useChromeScrollRegion(): {
     });
   }, [scrollId]);
 
-  const Provider = useCallback(({ children }: { children?: React.ReactNode }) =>
-    React.createElement(ChromeScroll.Provider, { value: scrollId }, children), [scrollId]);
+  const Provider = useCallback(
+    ({ children }: { children?: React.ReactNode }) =>
+      React.createElement(ChromeScroll.Provider, { value: scrollId }, children),
+    [scrollId],
+  );
 
   return { scrollId, onScroll, onLayout, ref, Provider };
 }
@@ -168,7 +181,12 @@ export function useChrome(spec: ChromeSpec, deps: readonly unknown[]): ChromeBin
     });
   }, [measure]);
 
-  const onLayout = useCallback((_e: LayoutChangeEvent) => { scheduleMeasure(); }, [scheduleMeasure]);
+  const onLayout = useCallback(
+    (_e: LayoutChangeEvent) => {
+      scheduleMeasure();
+    },
+    [scheduleMeasure],
+  );
 
   // ⚠️ A bump says "something above you MOVED", but native layout is applied
   // asynchronously — the next frame's `measureInWindow` can still report the
@@ -189,29 +207,38 @@ export function useChrome(spec: ChromeSpec, deps: readonly unknown[]): ChromeBin
 
   // Re-publish whenever the caller's inputs change (colours, images, a slider
   // value) without needing a re-measure — the box is unchanged.
-  useEffect(() => { publish(); }, deps);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    publish();
+  }, deps); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A screen becoming visible moves it without changing its own size, so
   // onLayout does NOT fire. Re-measure on mount and whenever deps change so a
   // revealed screen publishes its real position rather than its parked one.
-  useEffect(() => { scheduleMeasure(); }, [scheduleMeasure]);
+  useEffect(() => {
+    scheduleMeasure();
+  }, [scheduleMeasure]);
 
   // …and whenever something above us moved the whole screen (see
   // bumpChromeLayout / remeasureAfterMove).
   useEffect(() => {
     layoutListeners.add(remeasureAfterMove);
-    return () => { layoutListeners.delete(remeasureAfterMove); };
+    return () => {
+      layoutListeners.delete(remeasureAfterMove);
+    };
   }, [remeasureAfterMove]);
 
   // The backstop for every mover nobody enumerated — see uiChrome.ts's sweep.
   useEffect(() => registerChromeMeasure(measure), [measure]);
 
-  useEffect(() => () => {
-    if (settleTimer.current !== null) clearTimeout(settleTimer.current);
-    if (measureRaf.current !== null) cancelAnimationFrame(measureRaf.current);
-    ids.current.forEach(clearChrome);
-    ids.current = [];
-  }, []);
+  useEffect(
+    () => () => {
+      if (settleTimer.current !== null) clearTimeout(settleTimer.current);
+      if (measureRaf.current !== null) cancelAnimationFrame(measureRaf.current);
+      ids.current.forEach(clearChrome);
+      ids.current = [];
+    },
+    [],
+  );
 
   return { ref, onLayout };
 }

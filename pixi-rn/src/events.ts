@@ -82,6 +82,8 @@ export function createNativeEventBridge(root: Container): NativeEventBridge {
   return {
     root,
     dispatch,
-    destroy() { pointers.clear(); },
+    destroy() {
+      pointers.clear();
+    },
   };
 }

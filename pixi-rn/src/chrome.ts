@@ -25,15 +25,40 @@
 export type UiTexKey = string;
 
 /** A source sub-rect of a sheet, in source pixels (coin frames, owl skins). */
-export interface SrcCrop { sx: number; sy: number; sw: number; sh: number }
+export interface SrcCrop {
+  sx: number;
+  sy: number;
+  sw: number;
+  sh: number;
+}
 
 export type ChromeCmd =
   // 9-sliced border art (panel frames, button faces, bars). `inset` is the
   // source corner, `corner` the destination corner — same meaning as the Skia
   // NineSlice this replaces.
-  | { kind: 'nine'; tex: UiTexKey; x: number; y: number; w: number; h: number; inset: number; corner: number; alpha?: number }
+  | {
+      kind: 'nine';
+      tex: UiTexKey;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      inset: number;
+      corner: number;
+      alpha?: number;
+    }
   // A whole image (or a sub-rect of one) stretched into the box.
-  | { kind: 'img'; tex: UiTexKey; x: number; y: number; w: number; h: number; crop?: SrcCrop; tint?: number; alpha?: number }
+  | {
+      kind: 'img';
+      tex: UiTexKey;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      crop?: SrcCrop;
+      tint?: number;
+      alpha?: number;
+    }
   // A plain solid rectangle. The building block for anything the kit draws
   // without art — including pixel-staircase diagonals, which is how the
   // character-picker chevrons keep their hard aliased edges (they were a Skia
@@ -42,8 +67,19 @@ export type ChromeCmd =
   // Pixel-stair card: stepped-corner fill with an optional stepped border.
   // Colours are 0xRRGGBB + alpha, because pixi tints a 1x1 white texture —
   // Graphics is unavailable here (it lazily rasterizes a 2D canvas).
-  | { kind: 'stair'; x: number; y: number; w: number; h: number; cut: number;
-      fill: number; fillAlpha: number; border?: number; borderAlpha?: number; borderWidth?: number }
+  | {
+      kind: 'stair';
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      cut: number;
+      fill: number;
+      fillAlpha: number;
+      border?: number;
+      borderAlpha?: number;
+      borderWidth?: number;
+    }
   // A run of text in the bitmap font (render/pixi/bitmapFont.ts). `x`/`y` is
   // the box the RN component occupies; `align` places the glyphs inside `w`,
   // which is what lets a centred label sit in a flex row unchanged.
@@ -54,10 +90,22 @@ export type ChromeCmd =
   // than its natural width by a flex parent is clipped with an ellipsis instead
   // of overflowing its row. The measured box IS the available width, so this is
   // the only place that can know it.
-  | { kind: 'text'; text: string; x: number; y: number; w: number; h: number;
-      size: number; color: number; outline?: number; outlineWidth?: number;
-      align?: 'left' | 'center' | 'right'; letterSpacing?: number; alpha?: number;
-      truncate?: boolean };
+  | {
+      kind: 'text';
+      text: string;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      size: number;
+      color: number;
+      outline?: number;
+      outlineWidth?: number;
+      align?: 'left' | 'center' | 'right';
+      letterSpacing?: number;
+      alpha?: number;
+      truncate?: boolean;
+    };
 
 // Commands live in a plain Map keyed by a per-instance id. Mutating it does NOT
 // notify anything: the pixi layer re-reads the whole map each frame, which is
@@ -112,25 +160,36 @@ export function chromeSurfaceOrigin(): { x: number; y: number } {
 // reports its live offset once per scroll event, and the layer draws chrome at
 // `y - (liveOffset - offsetWhenMeasured)`. One number per region per frame,
 // exact at any scroll position.
-interface ScrollRegion { y: number; view: { x: number; y: number; w: number; h: number } | null }
+interface ScrollRegion {
+  y: number;
+  view: { x: number; y: number; w: number; h: number } | null;
+}
 const scrollRegions = new Map<number, ScrollRegion>();
 
-export function newChromeScrollId(): number { return nextId++; }
+export function newChromeScrollId(): number {
+  return nextId++;
+}
 
 export function setChromeScroll(id: number, y: number): void {
   const region = scrollRegions.get(id);
-  if (region) region.y = y; else scrollRegions.set(id, { y, view: null });
+  if (region) region.y = y;
+  else scrollRegions.set(id, { y, view: null });
 }
 
 /** The region's visible box in screen coords — chrome outside it is clipped. */
 export function setChromeScrollViewport(id: number, view: { x: number; y: number; w: number; h: number } | null): void {
   const region = scrollRegions.get(id);
-  if (region) region.view = view; else scrollRegions.set(id, { y: 0, view });
+  if (region) region.view = view;
+  else scrollRegions.set(id, { y: 0, view });
 }
 
-export function clearChromeScroll(id: number): void { scrollRegions.delete(id); }
+export function clearChromeScroll(id: number): void {
+  scrollRegions.delete(id);
+}
 
-export function chromeScroll(id: number): ScrollRegion | undefined { return scrollRegions.get(id); }
+export function chromeScroll(id: number): ScrollRegion | undefined {
+  return scrollRegions.get(id);
+}
 
 // ── Self-healing sweep ───────────────────────────────────────────────────────
 // ⚠️ The alternative to this is ENUMERATING every event that can move a screen
@@ -162,14 +221,19 @@ export function tickChromeSweep(): void {
   sweepFns[sweepCursor++]?.();
 }
 
-export function newChromeId(): number { return nextId++; }
+export function newChromeId(): number {
+  return nextId++;
+}
 
 /** `depth` is the publisher's nesting depth in the RN tree — see ChromeEntry. */
 export function setChrome(id: number, cmd: ChromeCmd | null, depth = 0, scrollId = 0, baseScrollY = 0) {
-  if (cmd === null) { clearChrome(id); return; }
+  if (cmd === null) {
+    clearChrome(id);
+    return;
+  }
   const existing = cmds.get(id);
   if (existing && existing.depth === depth && existing.scrollId === scrollId) {
-    existing.cmd = cmd;               // in place; `sorted` already holds this entry
+    existing.cmd = cmd; // in place; `sorted` already holds this entry
     existing.baseScrollY = baseScrollY;
     return;
   }
@@ -186,10 +250,12 @@ export function clearChrome(id: number) {
 /** Entries in PAINT order: shallowest first, then by publication order. */
 export function chromeCommands(): readonly ChromeEntry[] {
   if (sortDirty) {
-    sorted = [...cmds.values()].sort((a, b) => (a.depth - b.depth) || (a.seq - b.seq));
+    sorted = [...cmds.values()].sort((a, b) => a.depth - b.depth || a.seq - b.seq);
     sortDirty = false;
   }
   return sorted;
 }
 
-export function chromeCount(): number { return cmds.size; }
+export function chromeCount(): number {
+  return cmds.size;
+}
