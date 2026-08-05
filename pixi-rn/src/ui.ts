@@ -495,6 +495,12 @@ export interface UiScrollListOptions {
   layout: LayoutStyles;
   /** Flex style for the content column the rows are added to. */
   content: LayoutStyles;
+  /** Row pitch. A released drag settles on a multiple of it, so the list is
+   *  never left showing a half-row that the visibility rule then hides. */
+  snap?: number;
+  /** The only affordance that anything exists below the fold — without it a
+   *  list that ends flush at its viewport reads as complete. */
+  scrollbar?: { texture: Texture; width: number; color?: number; alpha?: number };
 }
 
 /** Pixels a pointer must travel before the gesture counts as a scroll. */
@@ -521,15 +527,36 @@ export class UiScrollList extends Container {
   private startY = 0;
   private startOffset = 0;
   private moved = false;
+  private readonly snap: number;
+  private readonly track: Sprite | null;
+  private readonly thumb: Sprite | null;
 
   constructor(options: UiScrollListOptions) {
     super({ label: 'scroll-list' });
     this.layout = options.layout;
     this.eventMode = 'static';
     this.hitArea = this.hit;
+    this.snap = options.snap ?? 0;
     this.content = new Container({ label: 'scroll-content' });
     this.content.layout = options.content;
     this.addChild(this.content);
+    if (options.scrollbar) {
+      const bar = options.scrollbar;
+      this.track = new Sprite(bar.texture);
+      this.track.tint = bar.color ?? 0x000000;
+      this.track.alpha = (bar.alpha ?? 1) * 0.35;
+      this.thumb = new Sprite(bar.texture);
+      this.thumb.tint = bar.color ?? 0xffffff;
+      this.thumb.alpha = bar.alpha ?? 1;
+      for (const part of [this.track, this.thumb]) {
+        part.eventMode = 'none';
+        part.width = bar.width;
+        this.addChild(part);
+      }
+    } else {
+      this.track = null;
+      this.thumb = null;
+    }
     // ⚠️ CAPTURE phase. The rows are buttons and stop propagation on
     // `pointerdown`, so a bubble-phase listener here would only ever see
     // presses that missed a row — which on a full list is almost never.
@@ -564,12 +591,27 @@ export class UiScrollList extends Container {
   }
 
   private scrollTo(offset: number): void {
-    this.offset = Math.max(0, Math.min(this.maxOffset(), offset));
+    const max = this.maxOffset();
+    this.offset = Math.max(0, Math.min(max, offset));
     this.content.y = -this.offset;
     for (const row of this.content.children) {
       const top = row.y - this.offset;
       row.visible = top >= -0.5 && top + layoutSize(row).height <= this.viewportHeight + 0.5;
     }
+    this.syncScrollbar(max);
+  }
+
+  private syncScrollbar(max: number): void {
+    if (!this.track || !this.thumb) return;
+    // Nothing to scroll, nothing to advertise.
+    this.track.visible = this.thumb.visible = max > 0.5;
+    if (!this.track.visible) return;
+    const content = layoutSize(this.content).height;
+    const x = this.hit.width - this.track.width;
+    this.track.position.set(x, 0);
+    this.track.height = this.viewportHeight;
+    this.thumb.height = Math.max(12, (this.viewportHeight / content) * this.viewportHeight);
+    this.thumb.position.set(x, (this.offset / max) * (this.viewportHeight - this.thumb.height));
   }
 
   private onDown(event: FederatedPointerEvent): void {
@@ -589,6 +631,9 @@ export class UiScrollList extends Container {
 
   private onUp(event: FederatedPointerEvent): void {
     if (event.pointerId !== this.pointerId) return;
+    // Settle on a row boundary so the list never rests mid-row — a partial row
+    // is hidden by the visibility rule, which would read as a gap.
+    if (this.moved && this.snap > 0) this.scrollTo(Math.round(this.offset / this.snap) * this.snap);
     // `moved` deliberately SURVIVES the release: pixi dispatches `pointertap`
     // after `pointerup`, and the row's press handler reads it there. It is
     // cleared on the next press instead.
