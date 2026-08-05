@@ -119,7 +119,7 @@ export class UiPanel extends NineSliceSprite {
     this.eventMode = 'none';
     if (options.layout) this.layout = options.layout;
     if (options.width !== undefined || options.height !== undefined) {
-      this.resizeTo(options.width ?? this.width, options.height ?? this.height);
+      this.resize(options.width ?? this.width, options.height ?? this.height);
     }
   }
 
@@ -128,17 +128,24 @@ export class UiPanel extends NineSliceSprite {
   }
 
   applyLayout(width: number, height: number): void {
-    this.resizeTo(width, height);
+    this.resize(width, height);
   }
 
   /**
-   * ⚠️ The border has to be clamped against the DESTINATION, not just the
-   * source art. Opposite borders that together exceed the destination overlap
-   * in the middle, and the panel renders as a squashed smear of its own corners
-   * — which is exactly what a 34px-tall bar did with an 18px border top and
-   * bottom.
+   * The ONLY way to size a panel.
+   *
+   * ⚠️ Never assign `.width`/`.height` directly. The border is clamped against
+   * the DESTINATION as well as the source art — opposite borders that together
+   * exceed the destination would otherwise overlap in the middle and render as
+   * a smear of the panel's own corners. That clamp has to be RE-EVALUATED on
+   * every resize: a panel built at a placeholder size (say 1×1, waiting for
+   * layout) clamps its border to half a pixel, and a later `.width = 300` that
+   * skips this method leaves it there. A sub-pixel border is a degenerate
+   * nine-slice — the whole texture simply stretches, corners and all, which
+   * looks like a frame whose brackets have swollen and no longer meet their
+   * rails.
    */
-  private resizeTo(width: number, height: number): void {
+  resize(width: number, height: number): void {
     const border = Math.max(0, Math.min(this.border, width / 2, height / 2));
     this.leftWidth = this.rightWidth = border;
     this.topHeight = this.bottomHeight = border;
