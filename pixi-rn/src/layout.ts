@@ -49,7 +49,36 @@ function sizeOf(node: Container, axis: 'x' | 'y'): number {
 	return axis === 'x' ? bounds.width : bounds.height;
 }
 
-function layoutNode(node: LayoutNode): void {
+/** Bottom-up measure pass. Parents must never calculate intrinsic size from
+ * children whose own flex layout has not been resolved yet. */
+function measureNode(node: LayoutNode): void {
+	for (const child of node.children as LayoutNode[]) measureNode(child);
+	const style = node.layout;
+	if (!style) return;
+	const horizontal = style.flexDirection === 'row' || style.flexDirection === 'row-reverse';
+	const gap = style.gap ?? (horizontal ? style.columnGap : style.rowGap) ?? 0;
+	const paddingX = (style.paddingLeft ?? style.padding ?? 0) + (style.paddingRight ?? style.padding ?? 0);
+	const paddingY = (style.paddingTop ?? style.padding ?? 0) + (style.paddingBottom ?? style.padding ?? 0);
+	const children = node.children.filter((child) => {
+		const childStyle = (child as LayoutNode).layout;
+		return !!childStyle && childStyle.position !== 'absolute' && childStyle.display !== 'none';
+	}) as LayoutNode[];
+	if (style.width === undefined || style.width === 'auto' || style.width === 'intrinsic') {
+		const content = horizontal
+			? children.reduce((sum, child) => sum + sizeOf(child, 'x'), 0) + Math.max(0, children.length - 1) * gap
+			: children.reduce((max, child) => Math.max(max, sizeOf(child, 'x')), 0);
+		if (content > 0) node.width = content + paddingX;
+	}
+	if (style.height === undefined || style.height === 'auto' || style.height === 'intrinsic') {
+		const content = horizontal
+			? children.reduce((max, child) => Math.max(max, sizeOf(child, 'y')), 0)
+			: children.reduce((sum, child) => sum + sizeOf(child, 'y'), 0) + Math.max(0, children.length - 1) * gap;
+		if (content > 0) node.height = content + paddingY;
+	}
+}
+
+/** Top-down placement pass after every intrinsic parent has been measured. */
+function placeNode(node: LayoutNode): void {
 	const style = node.layout;
 	if (style) {
 		const width = number(style.width, node.width || sizeOf(node, 'x'), node.width || sizeOf(node, 'x'));
@@ -99,11 +128,14 @@ function layoutNode(node: LayoutNode): void {
 			}
 		}
 	}
-	for (const child of node.children as LayoutNode[]) layoutNode(child);
+	for (const child of node.children as LayoutNode[]) placeNode(child);
 }
 
 /** Applies generic retained flex layout synchronously before the Pixi render. */
-export function applyFlexLayout(root: Container): void { layoutNode(root as LayoutNode); }
+export function applyFlexLayout(root: Container): void {
+	measureNode(root as LayoutNode);
+	placeNode(root as LayoutNode);
+}
 
 /** Indicates that pixi-rn's Expo-safe layout implementation is available. */
 export const pixiLayoutReady = true;
