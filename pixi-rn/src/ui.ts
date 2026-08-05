@@ -108,15 +108,19 @@ export interface UiPanelOptions {
 
 /** A mesh-based nine-slice panel (safe here — no canvas rasterization). */
 export class UiPanel extends NineSliceSprite {
+  private readonly border: number;
+
   constructor(texture: Texture, options: UiPanelOptions) {
     const border = Math.min(options.corner ?? options.inset, options.inset);
     super({ texture, leftWidth: border, topHeight: border, rightWidth: border, bottomHeight: border });
+    this.border = border;
     this.position.set(options.x ?? 0, options.y ?? 0);
-    if (options.width !== undefined) this.width = options.width;
-    if (options.height !== undefined) this.height = options.height;
     this.alpha = options.alpha ?? 1;
     this.eventMode = 'none';
     if (options.layout) this.layout = options.layout;
+    if (options.width !== undefined || options.height !== undefined) {
+      this.resizeTo(options.width ?? this.width, options.height ?? this.height);
+    }
   }
 
   measureLayout(): LayoutSize {
@@ -124,6 +128,20 @@ export class UiPanel extends NineSliceSprite {
   }
 
   applyLayout(width: number, height: number): void {
+    this.resizeTo(width, height);
+  }
+
+  /**
+   * ⚠️ The border has to be clamped against the DESTINATION, not just the
+   * source art. Opposite borders that together exceed the destination overlap
+   * in the middle, and the panel renders as a squashed smear of its own corners
+   * — which is exactly what a 34px-tall bar did with an 18px border top and
+   * bottom.
+   */
+  private resizeTo(width: number, height: number): void {
+    const border = Math.max(0, Math.min(this.border, width / 2, height / 2));
+    this.leftWidth = this.rightWidth = border;
+    this.topHeight = this.bottomHeight = border;
     this.width = width;
     this.height = height;
   }

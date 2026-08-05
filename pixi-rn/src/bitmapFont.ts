@@ -142,7 +142,17 @@ export function installBitmapFont(atlas: Texture, raw: GeneratedBitmapFont): Bit
     ),
     fontSize: raw.info.size,
     lineHeight: raw.common.lineHeight,
-    baseLineOffset: raw.common.base,
+    // ⚠️ NOT `common.base`. BMFont's `base` is the baseline measured DOWN from
+    // the line top; pixi wants the leftover BELOW the baseline, which is what
+    // its own parsers compute (`lineHeight - base`, see
+    // bitmapFontTextParser.ts) and what its render pipe assumes — it starts the
+    // first line at `currentY = baseLineOffset`. Passing `base` here drew every
+    // label exactly one em BELOW its own layout box: titles overlapped whatever
+    // followed them, checkboxes sat above their labels, and text hung low in
+    // every panel. Invisible to `getBounds()`, which reports a BitmapText's
+    // layout box rather than where the glyph quads land — see the glsmoke
+    // check that now pins this.
+    baseLineOffset: raw.common.lineHeight - raw.common.base,
     fontFamily: raw.info.face,
     distanceField: { type: raw.distanceField.fieldType, range: raw.distanceField.distanceRange },
   };
