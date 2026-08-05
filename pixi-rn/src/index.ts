@@ -8,7 +8,7 @@ import './adapter';
 import './layout';
 
 export { fakeCanvas, pixiEnvReady } from './adapter';
-export { pixiLayoutReady } from './layout';
+export { applyFlexLayout, pixiLayoutReady, type LayoutStyles } from './layout';
 export { setPixiRnLogger, type PixiRnLogger } from './log';
 
 // The single frame loop: rAF, dt clamping, present, and error containment.
@@ -53,7 +53,7 @@ export { createNativeEventBridge, type NativeEventBridge, type NativePointerInpu
 // Generic retained UI primitives. These are Expo-safe: no Graphics, Text, or
 // canvas-backed Texture.WHITE.
 export {
-  createUiRect, UiButton, UiImage, UiLabel, UiPanel, UiSlider,
+  createUiLayout, createUiRect, UiButton, UiImage, UiLabel, UiPanel, UiSlider,
   type UiRectOptions, type UiImageOptions, type UiLabelOptions,
   type UiPanelOptions, type UiButtonOptions, type UiSliderOptions,
 } from './ui';

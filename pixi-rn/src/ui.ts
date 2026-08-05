@@ -5,6 +5,7 @@
 // white texture from makeWhiteTexture() for solid-colour elements.
 import './adapter';
 import { BitmapText, Container, NineSliceSprite, Rectangle, Sprite, Texture } from 'pixi.js';
+import type { LayoutStyles } from './layout';
 import type { FederatedPointerEvent } from 'pixi.js';
 
 import { createBitmapText, type BitmapTextOptions } from './bitmapFont';
@@ -29,6 +30,13 @@ export function createUiRect(white: Texture, options: UiRectOptions): Sprite {
   return rect;
 }
 
+/** A named flex container. Layout is applied by @pixi/layout's Yoga system. */
+export function createUiLayout(style: LayoutStyles, label = 'ui-layout'): Container {
+  const container = new Container({ label });
+  container.layout = style;
+  return container;
+}
+
 export interface UiImageOptions {
   x?: number;
   y?: number;
@@ -36,6 +44,7 @@ export interface UiImageOptions {
   height?: number;
   tint?: number;
   alpha?: number;
+  layout?: LayoutStyles;
 }
 
 /** A retained image with optional destination dimensions. */
@@ -47,6 +56,7 @@ export class UiImage extends Sprite {
     if (options.height !== undefined) this.height = options.height;
     this.tint = options.tint ?? 0xffffff;
     this.alpha = options.alpha ?? 1;
+    if (options.layout) this.layout = { ...options.layout, isLeaf: true, applySizeDirectly: true };
   }
 }
 
@@ -60,6 +70,7 @@ export interface UiPanelOptions {
   rightWidth: number;
   bottomHeight: number;
   alpha?: number;
+  layout?: LayoutStyles;
 }
 
 /** A retained mesh-based nine-slice panel. */
@@ -76,6 +87,7 @@ export class UiPanel extends NineSliceSprite {
     this.width = options.width;
     this.height = options.height;
     this.alpha = options.alpha ?? 1;
+    if (options.layout) this.layout = options.layout;
   }
 
   setSize(width: number, height: number): this {
@@ -90,6 +102,7 @@ export interface UiLabelOptions extends BitmapTextOptions {
   y?: number;
   alpha?: number;
   outline?: { color: number; width?: number };
+  layout?: LayoutStyles;
 }
 
 const OUTLINE_DIRECTIONS: readonly (readonly [number, number])[] = [
@@ -108,6 +121,7 @@ export class UiLabel extends Container {
     super();
     this.position.set(options.x ?? 0, options.y ?? 0);
     this.alpha = options.alpha ?? 1;
+    if (options.layout) this.layout = options.layout;
     this.outlineWidth = options.outline?.width ?? 1;
     this.outlines = options.outline
       ? OUTLINE_DIRECTIONS.map(([x, y]) => {
@@ -144,6 +158,7 @@ export interface UiButtonOptions {
   pressedOffset?: number;
   disabled?: boolean;
   onPress?: () => void;
+  layout?: LayoutStyles;
 }
 
 /** Interactive retained button with a stable hit rectangle and pressed offset. */
@@ -160,6 +175,7 @@ export class UiButton extends Container {
     this.pressedOffset = options.pressedOffset ?? 1;
     this.onPress = options.onPress;
     this.eventMode = 'static';
+    if (options.layout) this.layout = options.layout;
     this.hitArea = new Rectangle(0, 0, options.width, options.height);
     this.addChild(this.visual);
     if (options.content) this.visual.addChild(options.content);

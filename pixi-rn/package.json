@@ -1,7 +1,7 @@
 {
   "name": "pixi-rn",
   "version": "0.1.0",
-  "description": "pixi.js v8 inside React Native on expo-gl: renderer bring-up, Yoga layout, federated native input, texture upload, bitmap text, and a frame loop.",
+  "description": "pixi.js v8 inside React Native on expo-gl: renderer bring-up, retained flex layout, federated native input, texture upload, bitmap text, and a frame loop.",
   "license": "MIT",
   "private": false,
   "main": "src/index.ts",
@@ -22,12 +22,10 @@
     "ui"
   ],
   "peerDependencies": {
-    "@pixi/layout": "^3.0.0",
     "expo-asset": "*",
     "expo-gl": "*",
     "pixi.js": "^8.0.0",
     "react": "*",
-    "react-native": "*",
-    "yoga-layout": "^3.0.0"
+    "react-native": "*"
   }
 }
