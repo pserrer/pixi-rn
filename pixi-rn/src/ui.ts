@@ -11,7 +11,7 @@
 import './adapter';
 import { BitmapText, Container, NineSliceSprite, Rectangle, Sprite, Texture } from 'pixi.js';
 import type { FederatedPointerEvent } from 'pixi.js';
-import type { LayoutSize, LayoutStyles } from './layout';
+import { layoutSize, type LayoutSize, type LayoutStyles } from './layout';
 
 import { createBitmapText, measureText, type BitmapTextOptions } from './bitmapFont';
 
@@ -480,5 +480,111 @@ export class UiSlider extends Container {
     const local = this.toLocal(event.global);
     const travel = this.travel();
     this.setValue(travel === 0 ? 0 : (local.x - this.thumb.width / 2) / travel, true);
+  }
+}
+
+export interface UiScrollListOptions {
+  /** The viewport: what stays visible. Content taller than this scrolls. */
+  layout: LayoutStyles;
+  /** Flex style for the content column the rows are added to. */
+  content: LayoutStyles;
+}
+
+/** Pixels a pointer must travel before the gesture counts as a scroll. */
+const DRAG_THRESHOLD = 6;
+
+/**
+ * A vertically scrolling list.
+ *
+ * ⚠️ There is no clipping available here — a mask needs `Graphics`, which
+ * lazily rasterizes a 2D canvas that does not exist on expo-gl (see
+ * adapter.ts). So clipping is VISIBILITY: a row not fully inside the viewport
+ * is not drawn at all, rather than spilling past the panel framing it. Rows pop
+ * in and out at the edges instead of sliding under them; that is the accepted
+ * trade, and the same all-or-nothing rule the RN-era chrome layer used for the
+ * shapes it could not trim geometrically.
+ */
+export class UiScrollList extends Container {
+  /** Rows go here — it is an ordinary flex column. */
+  readonly content: Container;
+  private readonly hit = new Rectangle(0, 0, 0, 0);
+  private viewportHeight = 0;
+  private offset = 0;
+  private pointerId: number | null = null;
+  private startY = 0;
+  private startOffset = 0;
+  private moved = false;
+
+  constructor(options: UiScrollListOptions) {
+    super({ label: 'scroll-list' });
+    this.layout = options.layout;
+    this.eventMode = 'static';
+    this.hitArea = this.hit;
+    this.content = new Container({ label: 'scroll-content' });
+    this.content.layout = options.content;
+    this.addChild(this.content);
+    // ⚠️ CAPTURE phase. The rows are buttons and stop propagation on
+    // `pointerdown`, so a bubble-phase listener here would only ever see
+    // presses that missed a row — which on a full list is almost never.
+    this.on('pointerdowncapture', this.onDown, this);
+    this.on('globalpointermove', this.onMove, this);
+    this.on('pointerupcapture', this.onUp, this);
+    this.on('pointerupoutside', this.onUp, this);
+  }
+
+  applyLayout(width: number, height: number): void {
+    this.hit.width = width;
+    this.hit.height = height;
+    this.viewportHeight = height;
+  }
+
+  /** Rows are only positioned once the whole tree is arranged. */
+  layoutComplete(): void {
+    this.scrollTo(this.offset);
+  }
+
+  /**
+   * Whether the gesture that just ended actually scrolled. A row must consult
+   * this before acting on its press — otherwise flicking the list buys
+   * whatever happened to be under the finger.
+   */
+  get scrolled(): boolean {
+    return this.moved;
+  }
+
+  private maxOffset(): number {
+    return Math.max(0, layoutSize(this.content).height - this.viewportHeight);
+  }
+
+  private scrollTo(offset: number): void {
+    this.offset = Math.max(0, Math.min(this.maxOffset(), offset));
+    this.content.y = -this.offset;
+    for (const row of this.content.children) {
+      const top = row.y - this.offset;
+      row.visible = top >= -0.5 && top + layoutSize(row).height <= this.viewportHeight + 0.5;
+    }
+  }
+
+  private onDown(event: FederatedPointerEvent): void {
+    this.pointerId = event.pointerId;
+    this.startY = event.global.y;
+    this.startOffset = this.offset;
+    this.moved = false;
+  }
+
+  private onMove(event: FederatedPointerEvent): void {
+    if (event.pointerId !== this.pointerId) return;
+    const delta = this.startY - event.global.y;
+    if (!this.moved && Math.abs(delta) < DRAG_THRESHOLD) return;
+    this.moved = true;
+    this.scrollTo(this.startOffset + delta);
+  }
+
+  private onUp(event: FederatedPointerEvent): void {
+    if (event.pointerId !== this.pointerId) return;
+    // `moved` deliberately SURVIVES the release: pixi dispatches `pointertap`
+    // after `pointerup`, and the row's press handler reads it there. It is
+    // cleared on the next press instead.
+    this.pointerId = null;
   }
 }

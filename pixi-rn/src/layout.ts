@@ -65,6 +65,11 @@ declare module 'pixi.js' {
     /** The final resolved box. A leaf that draws at a size applies it here —
      *  never earlier, since `arrange` can still stretch or shrink it. */
     applyLayout?(width: number, height: number): void;
+    /** Called once the WHOLE tree is positioned. `applyLayout` runs before a
+     *  node's children are placed, so anything that needs its descendants'
+     *  final coordinates — a scroller culling rows against its viewport —
+     *  belongs here instead. */
+    layoutComplete?(): void;
   }
 }
 
@@ -276,6 +281,12 @@ export function applyFlexLayout(root: Container): void {
   measure(root, width, height);
   const size = sizeOf(root);
   arrange(root, width || size.width, height || size.height);
+  notifyComplete(root);
+}
+
+function notifyComplete(node: Node): void {
+  node.layoutComplete?.();
+  for (const child of node.children as Node[]) notifyComplete(child);
 }
 
 /** The resolved box of a node from the last `applyFlexLayout` pass. */

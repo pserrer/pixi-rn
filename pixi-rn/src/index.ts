@@ -53,11 +53,13 @@ export {
   UiLabel,
   UiPanel,
   UiRect,
+  UiScrollList,
   UiSlider,
   type UiRectOptions,
   type UiImageOptions,
   type UiLabelOptions,
   type UiPanelOptions,
   type UiButtonOptions,
+  type UiScrollListOptions,
   type UiSliderOptions,
 } from './ui';
