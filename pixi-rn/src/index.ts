@@ -8,7 +8,7 @@ import './adapter';
 import './layout';
 
 export { fakeCanvas, pixiEnvReady } from './adapter';
-export { applyFlexLayout, pixiLayoutReady, type LayoutStyles } from './layout';
+export { applyFlexLayout, layoutSize, type LayoutSize, type LayoutStyles } from './layout';
 export { setPixiRnLogger, type PixiRnLogger } from './log';
 
 // The single frame loop: rAF, dt clamping, present, and error containment.
@@ -35,42 +35,6 @@ export {
   type BitmapTextOptions,
 } from './bitmapFont';
 
-// The seam: RN publishes what to draw and where, pixi draws it in its own frame.
-export {
-  newChromeId,
-  setChrome,
-  clearChrome,
-  chromeCommands,
-  chromeCount,
-  newChromeScrollId,
-  setChromeScroll,
-  setChromeScrollViewport,
-  clearChromeScroll,
-  chromeScroll,
-  registerChromeMeasure,
-  tickChromeSweep,
-  setChromeSurfaceOrigin,
-  chromeSurfaceOrigin,
-  type ChromeCmd,
-  type ChromeEntry,
-  type SrcCrop,
-  type UiTexKey,
-} from './chrome';
-
-export {
-  useChrome,
-  useChromeScrollRegion,
-  ChromeDepthProvider,
-  bumpChromeLayout,
-  type ChromeSpec,
-  type ChromeBinding,
-} from './useChrome';
-
-export { createUiChromeLayer, type UiChromeLayer, type ChromeTextures } from './chromeLayer';
-
-export { PixelText } from './PixelText';
-export { parseColor } from './color';
-
 // Native surface input → Pixi v8 federated events.
 export {
   createNativeEventBridge,
@@ -88,6 +52,7 @@ export {
   UiImage,
   UiLabel,
   UiPanel,
+  UiRect,
   UiSlider,
   type UiRectOptions,
   type UiImageOptions,

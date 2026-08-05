@@ -1,6 +1,6 @@
 // ── The one font, as a pixi BitmapText font ──────────────────────────────────
-// Every piece of UI text in the game draws through this (ui/PixelText.tsx →
-// uiChrome → uiChromeLayer) instead of through native RN <Text> nodes.
+// Every piece of UI text in the game draws through this (`UiLabel` in ui.ts)
+// instead of through native RN <Text> nodes.
 //
 // Two things make that viable, and both are load-bearing:
 //
@@ -14,10 +14,9 @@
 // 2. TEXT CAN BE MEASURED SYNCHRONOUSLY IN JS (`measureText` below). A bitmap
 //    font's advance widths are just numbers in the metrics, so a label knows
 //    its own size without asking native to lay it out. That is what lets
-//    PixelText render a correctly-sized View and keep every screen's existing
-//    flex layout — the alternative (a label not knowing its size until a
-//    measured rect came back) would have meant rewriting 11 screens into
-//    absolute pixel math.
+//    a label report its own size to the flex pass in `layout.ts` like any
+//    other node. Without it a label could not size itself until a measured
+//    rect came back, and every screen would have to be absolute pixel maths.
 //
 // ⚠️ adapter FIRST — Hermes/expo-gl compatibility before any pixi class is
 // evaluated.
@@ -82,18 +81,18 @@ export interface TextMetrics {
 /**
  * Measure a string in the bitmap font, synchronously, with no native call.
  *
- * ⚠️ This MUST agree with what pixi lays out, because PixelText sizes its RN
- * View from this while uiChromeLayer positions the glyphs from pixi — a
- * mismatch shows up as text drifting out of its own box. Pixi accumulates
+ * ⚠️ This MUST agree with what pixi lays out, because `UiLabel` reports its
+ * layout box from this while pixi positions the glyphs — a mismatch shows up
+ * as text drifting out of its own box. Pixi accumulates
  * `xAdvance + letterSpacing * (baseSize / fontSize)` per character in atlas
  * units and then scales by `fontSize / baseSize`, which reduces to the
  * expression below: letter spacing contributes exactly `letterSpacing` screen
  * pixels per character, INCLUDING after the last one. There is no kerning to
  * account for — the generated font has none.
  *
- * Newlines are honoured, but the UI convention is one label per line (see the
- * OutlineText note in AGENTS.md); this mainly exists so a stray `\n` cannot
- * silently produce a box that clips.
+ * Newlines are honoured, but the UI convention is one label per line (the
+ * outline is 8 drawn copies per label); this mainly exists so a stray `\n`
+ * cannot silently produce a box that clips.
  */
 export function measureText(text: string, fontSize: number, letterSpacing = 0): TextMetrics {
   if (!RAW) return { width: 0, height: 0 };

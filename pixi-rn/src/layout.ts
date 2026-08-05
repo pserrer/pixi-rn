@@ -1,25 +1,43 @@
-// `@pixi/layout` is Yoga/WASM based. Hermes in the Expo runtime used by this
-// package does not expose WebAssembly, so importing it makes renderer.init()
-// fail before the first frame. Keep the public layout vocabulary, but provide
-// a small JS flex pass for the subset a canvas game UI needs. It is deliberately
-// generic: no game assets, coordinates or component assumptions live here.
+// A small flexbox pass for retained Pixi trees.
+//
+// ⚠️ `@pixi/layout` is Yoga/WASM based and Hermes exposes no WebAssembly, so
+// importing it makes `renderer.init()` fail before the first frame. This is the
+// replacement: the subset of the flex vocabulary a canvas game UI actually
+// needs, in plain JS. Deliberately generic — no game assets, coordinates or
+// component assumptions live here.
+//
+// Two passes, the same shape Yoga uses:
+//   1. `measure` — bottom-up intrinsic sizing. A leaf reports its own content
+//      size through `measureLayout()`; a container sums/maxes its children.
+//   2. `arrange` — top-down final placement. This is where `flex` grow,
+//      `flexShrink` and `alignItems: 'stretch'` hand a child a size DIFFERENT
+//      from the one it measured, and where each node learns its final box via
+//      `applyLayout()`.
+//
+// The split matters: a parent must never derive its intrinsic size from a child
+// whose own layout has not resolved yet, and a leaf must never paint at a size
+// before the pass that could still stretch or shrink it has run.
 import { Container } from 'pixi.js';
 
 /** Expo-safe subset of the @pixi/layout style vocabulary. */
 export interface LayoutStyles {
-  width?: number | `${number}%` | 'auto' | 'intrinsic';
-  height?: number | `${number}%` | 'auto' | 'intrinsic';
+  width?: number | `${number}%` | 'auto';
+  height?: number | `${number}%` | 'auto';
   position?: 'absolute' | 'relative';
   left?: number | `${number}%`;
   top?: number | `${number}%`;
+  right?: number | `${number}%`;
+  bottom?: number | `${number}%`;
+  /** Share of the parent's leftover main-axis space (grow factor). */
   flex?: number;
-  flexDirection?: 'row' | 'column' | 'row-reverse' | 'column-reverse';
+  /** Share of a main-axis overflow this child absorbs. Text uses it to
+   *  ellipsize instead of pushing its row's other content off the edge. */
+  flexShrink?: number;
+  flexDirection?: 'row' | 'column';
   justifyContent?: 'flex-start' | 'flex-end' | 'center' | 'space-between';
   alignItems?: 'flex-start' | 'flex-end' | 'center' | 'stretch';
   alignSelf?: 'auto' | 'flex-start' | 'flex-end' | 'center' | 'stretch';
   gap?: number;
-  rowGap?: number;
-  columnGap?: number;
   padding?: number;
   paddingTop?: number;
   paddingRight?: number;
@@ -30,190 +48,237 @@ export interface LayoutStyles {
   marginRight?: number;
   marginBottom?: number;
   marginLeft?: number;
-  display?: 'none' | 'flex' | 'contents';
-  isLeaf?: boolean;
-  applySizeDirectly?: boolean;
+  display?: 'none' | 'flex';
+}
+
+export interface LayoutSize {
+  width: number;
+  height: number;
 }
 
 declare module 'pixi.js' {
   interface Container {
     layout?: LayoutStyles;
+    /** Intrinsic content size, asked for whenever a dimension is `auto`. Only
+     *  leaves implement this; a container derives its size from its children. */
+    measureLayout?(): LayoutSize;
+    /** The final resolved box. A leaf that draws at a size applies it here —
+     *  never earlier, since `arrange` can still stretch or shrink it. */
+    applyLayout?(width: number, height: number): void;
   }
 }
 
-interface LayoutBox {
-  width: number;
-  height: number;
-}
+type Node = Container;
 
-type LayoutNode = Container & { layout?: LayoutStyles; __pixiRnLayoutBox?: LayoutBox };
+// Measured intrinsic sizes, keyed off the node itself so nothing is written
+// onto the display object (a stray enumerable property on a Container ends up
+// in every JSON dump and every shallow clone).
+const measured = new WeakMap<Node, LayoutSize>();
 
-function number(value: unknown, available: number, fallback: number): number {
+const EMPTY: LayoutStyles = {};
+const styleOf = (node: Node): LayoutStyles => node.layout ?? EMPTY;
+
+function resolve(value: LayoutStyles['width'], available: number): number | null {
   if (typeof value === 'number') return value;
   if (typeof value === 'string' && value.endsWith('%')) return (available * Number.parseFloat(value)) / 100;
-  return fallback;
+  return null;
 }
 
-function visualSizeOf(node: Container, axis: 'x' | 'y'): number {
-  const bounds = node.getLocalBounds();
-  return axis === 'x' ? bounds.width : bounds.height;
+function pad(style: LayoutStyles, side: 'Top' | 'Right' | 'Bottom' | 'Left'): number {
+  return style[`padding${side}` as 'paddingTop'] ?? style.padding ?? 0;
+}
+function margin(style: LayoutStyles, side: 'Top' | 'Right' | 'Bottom' | 'Left'): number {
+  return style[`margin${side}` as 'marginTop'] ?? style.margin ?? 0;
 }
 
-function boxOf(node: LayoutNode): LayoutBox {
-  if (node.__pixiRnLayoutBox) return node.__pixiRnLayoutBox;
-  return { width: visualSizeOf(node, 'x'), height: visualSizeOf(node, 'y') };
-}
+const isRow = (style: LayoutStyles) => style.flexDirection === 'row';
+const paddingX = (s: LayoutStyles) => pad(s, 'Left') + pad(s, 'Right');
+const paddingY = (s: LayoutStyles) => pad(s, 'Top') + pad(s, 'Bottom');
+const marginX = (s: LayoutStyles) => margin(s, 'Left') + margin(s, 'Right');
+const marginY = (s: LayoutStyles) => margin(s, 'Top') + margin(s, 'Bottom');
 
-function setBox(node: LayoutNode, width: number, height: number): void {
-  node.__pixiRnLayoutBox = { width: Math.max(0, width), height: Math.max(0, height) };
-  // Pixi Containers implement width/height by scaling their children. Only
-  // true render leaves may receive a visual size from layout; wrapper and
-  // screen containers keep their native scale at 1.
-  if (node.layout?.isLeaf || node.layout?.applySizeDirectly) {
-    if (width > 0) node.width = width;
-    if (height > 0) node.height = height;
+/** Children that take part in the normal flow (absolute + hidden ones don't). */
+function flowChildren(node: Node): Node[] {
+  const out: Node[] = [];
+  for (const child of node.children as Node[]) {
+    const style = child.layout;
+    if (!style || style.position === 'absolute' || style.display === 'none') continue;
+    out.push(child);
   }
+  return out;
 }
 
-function mainMargin(style: LayoutStyles | undefined, horizontal: boolean): { before: number; after: number } {
-  return horizontal
-    ? { before: style?.marginLeft ?? style?.margin ?? 0, after: style?.marginRight ?? style?.margin ?? 0 }
-    : { before: style?.marginTop ?? style?.margin ?? 0, after: style?.marginBottom ?? style?.margin ?? 0 };
+function sizeOf(node: Node): LayoutSize {
+  return measured.get(node) ?? { width: 0, height: 0 };
 }
 
-/** Bottom-up measure pass. Parents must never calculate intrinsic size from
- * children whose own flex layout has not been resolved yet. */
-function measureNode(node: LayoutNode, availableWidth = 0, availableHeight = 0): void {
-  const style = node.layout;
-  if (!style) {
-    setBox(node, visualSizeOf(node, 'x'), visualSizeOf(node, 'y'));
-    return;
-  }
-  // Resolve explicit/percentage dimensions before recursing so descendants
-  // receive the containing box. Intrinsic dimensions are resolved afterward
-  // from those measured descendants.
-  const existing = boxOf(node);
-  const explicitWidth = style.width !== undefined && style.width !== 'auto' && style.width !== 'intrinsic';
-  const explicitHeight = style.height !== undefined && style.height !== 'auto' && style.height !== 'intrinsic';
-  const provisionalWidth = explicitWidth ? number(style.width, availableWidth, existing.width) : existing.width;
-  const provisionalHeight = explicitHeight ? number(style.height, availableHeight, existing.height) : existing.height;
-  if (explicitWidth || explicitHeight) setBox(node, provisionalWidth, provisionalHeight);
-  const childAvailable = boxOf(node);
-  for (const child of node.children as LayoutNode[]) measureNode(child, childAvailable.width, childAvailable.height);
-  const horizontal = style.flexDirection === 'row' || style.flexDirection === 'row-reverse';
-  const gap = style.gap ?? (horizontal ? style.columnGap : style.rowGap) ?? 0;
-  const paddingX = (style.paddingLeft ?? style.padding ?? 0) + (style.paddingRight ?? style.padding ?? 0);
-  const paddingY = (style.paddingTop ?? style.padding ?? 0) + (style.paddingBottom ?? style.padding ?? 0);
-  const children = node.children.filter((child) => {
-    const childStyle = (child as LayoutNode).layout;
-    return !!childStyle && childStyle.position !== 'absolute' && childStyle.display !== 'none';
-  }) as LayoutNode[];
-  if (style.width === undefined || style.width === 'auto' || style.width === 'intrinsic') {
-    const content = horizontal
-      ? children.reduce((sum, child) => {
-          const margin = mainMargin(child.layout, true);
-          return sum + boxOf(child).width + margin.before + margin.after;
-        }, 0) +
-        Math.max(0, children.length - 1) * gap
-      : children.reduce((max, child) => Math.max(max, boxOf(child).width), 0);
-    availableWidth = content + paddingX;
-  }
-  if (style.height === undefined || style.height === 'auto' || style.height === 'intrinsic') {
-    const content = horizontal
-      ? children.reduce((max, child) => Math.max(max, boxOf(child).height), 0)
-      : children.reduce((sum, child) => {
-          const margin = mainMargin(child.layout, false);
-          return sum + boxOf(child).height + margin.before + margin.after;
-        }, 0) +
-        Math.max(0, children.length - 1) * gap;
-    availableHeight = content + paddingY;
-  }
-  const own = boxOf(node);
-  const width = explicitWidth ? number(style.width, availableWidth, own.width) : availableWidth || own.width;
-  const height = explicitHeight ? number(style.height, availableHeight, own.height) : availableHeight || own.height;
-  setBox(node, width, height);
-}
+// ── pass 1: intrinsic measure ───────────────────────────────────────────────
 
-/** Top-down placement pass after every intrinsic parent has been measured. */
-function placeNode(node: LayoutNode): void {
-  const style = node.layout;
-  if (style) {
-    const own = boxOf(node);
-    const width = own.width;
-    const height = own.height;
+function measure(node: Node, availableWidth: number, availableHeight: number): LayoutSize {
+  const style = styleOf(node);
+  if (style.display === 'none') {
+    const zero = { width: 0, height: 0 };
+    measured.set(node, zero);
+    return zero;
+  }
+  const definiteWidth = resolve(style.width, availableWidth);
+  const definiteHeight = resolve(style.height, availableHeight);
 
-    const horizontal = style.flexDirection === 'row' || style.flexDirection === 'row-reverse';
-    const mainSize = horizontal ? width : height;
-    const crossSize = horizontal ? height : width;
-    const paddingStart = horizontal
-      ? (style.paddingLeft ?? style.padding ?? 0)
-      : (style.paddingTop ?? style.padding ?? 0);
-    const paddingEnd = horizontal
-      ? (style.paddingRight ?? style.padding ?? 0)
-      : (style.paddingBottom ?? style.padding ?? 0);
-    const paddingCrossStart = horizontal
-      ? (style.paddingTop ?? style.padding ?? 0)
-      : (style.paddingLeft ?? style.padding ?? 0);
-    const paddingCrossEnd = horizontal
-      ? (style.paddingBottom ?? style.padding ?? 0)
-      : (style.paddingRight ?? style.padding ?? 0);
-    const gap = style.gap ?? (horizontal ? style.columnGap : style.rowGap) ?? 0;
-    const children = node.children.filter((child) => {
-      const childStyle = (child as LayoutNode).layout;
-      return !!childStyle && childStyle.position !== 'absolute' && childStyle.display !== 'none';
-    }) as LayoutNode[];
-    const itemMain = children.map((child) => {
-      const margin = mainMargin(child.layout, horizontal);
-      return (horizontal ? boxOf(child).width : boxOf(child).height) + margin.before + margin.after;
-    });
-    const occupied = itemMain.reduce((sum, value) => sum + value, 0) + Math.max(0, children.length - 1) * gap;
-    let cursor = paddingStart;
-    let actualGap = gap;
-    if (style.justifyContent === 'center') cursor += Math.max(0, (mainSize - paddingStart - paddingEnd - occupied) / 2);
-    if (style.justifyContent === 'flex-end') cursor += Math.max(0, mainSize - paddingStart - paddingEnd - occupied);
-    if (style.justifyContent === 'space-between' && children.length > 1)
-      actualGap = Math.max(
-        gap,
-        (mainSize - paddingStart - paddingEnd - itemMain.reduce((sum, value) => sum + value, 0)) /
-          (children.length - 1),
-      );
+  // Children see the content box when this node's size is already known, and
+  // the parent's remaining space when it isn't.
+  const innerWidth = (definiteWidth ?? availableWidth) - paddingX(style);
+  const innerHeight = (definiteHeight ?? availableHeight) - paddingY(style);
+  const children = flowChildren(node);
+  for (const child of children) measure(child, Math.max(0, innerWidth), Math.max(0, innerHeight));
+  for (const child of node.children as Node[]) {
+    if (child.layout?.position === 'absolute') measure(child, Math.max(0, innerWidth), Math.max(0, innerHeight));
+  }
 
-    children.forEach((child, index) => {
-      const childStyle = child.layout!;
-      const childMain = itemMain[index];
-      const childBox = boxOf(child);
-      const childCross = horizontal ? childBox.height : childBox.width;
-      const margin = mainMargin(childStyle, horizontal);
-      const align =
-        childStyle.alignSelf === 'auto' || childStyle.alignSelf === undefined ? style.alignItems : childStyle.alignSelf;
-      let cross = paddingCrossStart;
-      if (align === 'center') cross += Math.max(0, (crossSize - paddingCrossStart - paddingCrossEnd - childCross) / 2);
-      if (align === 'flex-end') cross += Math.max(0, crossSize - paddingCrossStart - paddingCrossEnd - childCross);
-      if (horizontal) {
-        child.x = cursor + margin.before;
-        child.y = cross;
+  let contentWidth = 0;
+  let contentHeight = 0;
+  if (children.length > 0) {
+    const row = isRow(style);
+    const gaps = Math.max(0, children.length - 1) * (style.gap ?? 0);
+    for (const child of children) {
+      const box = sizeOf(child);
+      const childStyle = styleOf(child);
+      const w = box.width + marginX(childStyle);
+      const h = box.height + marginY(childStyle);
+      if (row) {
+        contentWidth += w;
+        contentHeight = Math.max(contentHeight, h);
       } else {
-        child.x = cross;
-        child.y = cursor + margin.before;
-      }
-      cursor += childMain + actualGap;
-    });
-    for (const child of node.children as LayoutNode[]) {
-      const childStyle = child.layout;
-      if (childStyle?.position === 'absolute') {
-        child.x = number(childStyle.left, width, child.x);
-        child.y = number(childStyle.top, height, child.y);
+        contentWidth = Math.max(contentWidth, w);
+        contentHeight += h;
       }
     }
+    if (row) contentWidth += gaps;
+    else contentHeight += gaps;
+  } else if (node.measureLayout) {
+    const intrinsic = node.measureLayout();
+    contentWidth = intrinsic.width;
+    contentHeight = intrinsic.height;
   }
-  for (const child of node.children as LayoutNode[]) placeNode(child);
+
+  const size = {
+    width: definiteWidth ?? contentWidth + paddingX(style),
+    height: definiteHeight ?? contentHeight + paddingY(style),
+  };
+  measured.set(node, size);
+  return size;
 }
 
-/** Applies generic retained flex layout synchronously before the Pixi render. */
+// ── pass 2: final placement ─────────────────────────────────────────────────
+
+function crossAlign(parent: LayoutStyles, child: LayoutStyles): NonNullable<LayoutStyles['alignItems']> {
+  const self = child.alignSelf;
+  if (self && self !== 'auto') return self;
+  return parent.alignItems ?? 'flex-start';
+}
+
+function arrange(node: Node, width: number, height: number): void {
+  const style = styleOf(node);
+  if (style.display === 'none') {
+    node.visible = false;
+    return;
+  }
+  node.applyLayout?.(width, height);
+
+  const row = isRow(style);
+  const gap = style.gap ?? 0;
+  const innerMain = Math.max(0, (row ? width : height) - (row ? paddingX(style) : paddingY(style)));
+  const innerCross = Math.max(0, (row ? height : width) - (row ? paddingY(style) : paddingX(style)));
+  const children = flowChildren(node);
+
+  // Base main sizes, then distribute the leftover (flex) or the overflow
+  // (flexShrink). A child with neither keeps exactly what it measured.
+  const mains = children.map((child) => {
+    const box = sizeOf(child);
+    return row ? box.width : box.height;
+  });
+  const outer = children.map((child, i) => mains[i] + (row ? marginX(styleOf(child)) : marginY(styleOf(child))));
+  const gaps = Math.max(0, children.length - 1) * gap;
+  const free = innerMain - outer.reduce((sum, v) => sum + v, 0) - gaps;
+
+  if (free > 0) {
+    const grow = children.reduce((sum, child) => sum + (styleOf(child).flex ?? 0), 0);
+    if (grow > 0) {
+      children.forEach((child, i) => {
+        const factor = styleOf(child).flex ?? 0;
+        if (factor > 0) mains[i] += (free * factor) / grow;
+      });
+    }
+  } else if (free < 0) {
+    const shrink = children.reduce((sum, child) => sum + (styleOf(child).flexShrink ?? 0), 0);
+    if (shrink > 0) {
+      children.forEach((child, i) => {
+        const factor = styleOf(child).flexShrink ?? 0;
+        if (factor > 0) mains[i] = Math.max(0, mains[i] + (free * factor) / shrink);
+      });
+    }
+  }
+
+  const used = children.reduce(
+    (sum, child, i) => sum + mains[i] + (row ? marginX(styleOf(child)) : marginY(styleOf(child))),
+    0,
+  );
+  const slack = Math.max(0, innerMain - used - gaps);
+  let cursor = row ? pad(style, 'Left') : pad(style, 'Top');
+  let spacing = gap;
+  if (style.justifyContent === 'center') cursor += slack / 2;
+  else if (style.justifyContent === 'flex-end') cursor += slack;
+  else if (style.justifyContent === 'space-between' && children.length > 1) spacing += slack / (children.length - 1);
+
+  const crossStart = row ? pad(style, 'Top') : pad(style, 'Left');
+  children.forEach((child, i) => {
+    const childStyle = styleOf(child);
+    const box = sizeOf(child);
+    const align = crossAlign(style, childStyle);
+    const crossMargin = row ? margin(childStyle, 'Top') : margin(childStyle, 'Left');
+    const crossOuter = row ? marginY(childStyle) : marginX(childStyle);
+    const measuredCross = row ? box.height : box.width;
+    const cross =
+      align === 'stretch' ? Math.max(0, innerCross - crossOuter) : Math.min(measuredCross, Math.max(0, innerCross));
+    let crossOffset = crossStart + crossMargin;
+    if (align === 'center') crossOffset += Math.max(0, innerCross - crossOuter - cross) / 2;
+    else if (align === 'flex-end') crossOffset += Math.max(0, innerCross - crossOuter - cross);
+
+    const mainOffset = cursor + (row ? margin(childStyle, 'Left') : margin(childStyle, 'Top'));
+    child.x = Math.round(row ? mainOffset : crossOffset);
+    child.y = Math.round(row ? crossOffset : mainOffset);
+    arrange(child, row ? mains[i] : cross, row ? cross : mains[i]);
+    cursor += mains[i] + (row ? marginX(childStyle) : marginY(childStyle)) + spacing;
+  });
+
+  // Out-of-flow children are positioned against this node's padding box, with
+  // `right`/`bottom` measured from the opposite edge (a corner affordance that
+  // must hug the screen edge regardless of its own width).
+  for (const child of node.children as Node[]) {
+    const childStyle = child.layout;
+    if (childStyle?.position !== 'absolute') continue;
+    const box = sizeOf(child);
+    const left = resolve(childStyle.left, width);
+    const right = resolve(childStyle.right, width);
+    const top = resolve(childStyle.top, height);
+    const bottom = resolve(childStyle.bottom, height);
+    child.x = Math.round(left ?? (right !== null ? width - right - box.width : child.x));
+    child.y = Math.round(top ?? (bottom !== null ? height - bottom - box.height : child.y));
+    arrange(child, box.width, box.height);
+  }
+}
+
+/** Resolves a retained flex tree in place. Call it when the tree or a node's
+ *  content changed — NOT every frame; nothing here is incremental. */
 export function applyFlexLayout(root: Container): void {
-  measureNode(root as LayoutNode);
-  placeNode(root as LayoutNode);
+  const style = styleOf(root);
+  const width = resolve(style.width, 0) ?? 0;
+  const height = resolve(style.height, 0) ?? 0;
+  measure(root, width, height);
+  const size = sizeOf(root);
+  arrange(root, width || size.width, height || size.height);
 }
 
-/** Indicates that pixi-rn's Expo-safe layout implementation is available. */
-export const pixiLayoutReady = true;
+/** The resolved box of a node from the last `applyFlexLayout` pass. */
+export function layoutSize(node: Container): LayoutSize {
+  return sizeOf(node);
+}
