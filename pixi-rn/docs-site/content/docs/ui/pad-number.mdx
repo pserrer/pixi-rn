@@ -1,0 +1,40 @@
+---
+title: UiPadNumber
+description: A fixed-width, zero-padded counter — the arcade-odometer HUD idiom, updated without ever triggering layout.
+---
+
+```tsx
+import { UiPadNumber } from 'pixi-rn';
+
+const score = new UiPadNumber({
+  digits: 5,
+  suffix: 'm',
+  fontSize: 18,
+  letterSpacing: 1,
+  color: 0xffd700,
+  leadColor: 0x8b90a0, // dimmer — the padding zeros fade, the real digits stand out
+  outlineWidth: 2,
+});
+
+score.set(1204); // draws "01204m" — the leading "0" dim, "1204m" bright
+```
+
+## Why not just a `UiLabel`?
+
+The font is fixed-advance, so the padded string's **rendered width never
+changes with the value**. `set()` only touches the two digit runs' text
+(`UiLabel`'s own identity guard early-outs when a run's text didn't actually
+change), and never triggers [a flex layout pass](/docs/concepts/layout) —
+which matters a lot for a value updated every frame during, say, a
+speed-boost. A counter built from a plain label and re-measured on every tick
+would re-arrange its whole row 60 times a second, and a neighbouring control
+would visibly twitch as digits rolled over.
+
+## Outline colour
+
+`outlineWidth` picks its outline colour **per digit run**, via
+[`autoOutlineColor`](/docs/concepts/text#picking-a-legible-outline-colour) —
+`leadColor` and `color` can legitimately sit on opposite sides of the
+light/dark threshold (a very dim lead colour next to a bright gold value,
+say), and each run gets the outline that's actually legible against its own
+foreground rather than one shared guess.

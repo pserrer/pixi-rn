@@ -18,6 +18,13 @@ let logger: PixiRnLogger = {
   fail: (stage, error) => console.error('[pixi-rn]', stage, error),
 };
 
+/**
+ * Routes this package's own diagnostics (renderer bring-up, texture/font
+ * loads, frame-loop failures) somewhere other than the console — a host that
+ * persists them can recover a trace after a native crash the JS side never
+ * sees coming. Only the keys you pass are overridden; call with a partial
+ * logger to replace just `trace` or just `fail`.
+ */
 export function setPixiRnLogger(next: Partial<PixiRnLogger>): void {
   logger = { ...logger, ...next };
 }

@@ -1,0 +1,72 @@
+---
+title: Getting Started
+description: Install pixi-rn and get a coloured square on screen, driven by one frame loop.
+---
+
+## Install
+
+```sh
+npm install pixi-rn pixi.js expo-gl expo-asset
+```
+
+`pixi.js`, `expo-gl` and `expo-asset` are peer dependencies — pixi-rn doesn't
+pin their versions for you, since your app already does.
+
+## A minimal screen
+
+Everything below lives inside `GLView`'s `onContextCreate` — the one place
+you have a live GL context to build a renderer against.
+
+```tsx
+import { StyleSheet } from 'react-native';
+import { GLView, type ExpoWebGLRenderingContext } from 'expo-gl';
+import { Container } from 'pixi.js';
+import { createRenderer, makeWhiteTexture, startFrameLoop, UiRect } from 'pixi-rn';
+
+const W = 390;
+const H = 844;
+
+async function onContextCreate(gl: ExpoWebGLRenderingContext) {
+  // 1. The renderer — handles the WebGL1-vs-2 trap, the parked tickers, and
+  //    the `getParameter` guard for you. See "Concepts › Rendering".
+  const renderer = await createRenderer(gl, { width: W, height: H });
+
+  // 2. A scene. `Graphics` isn't available here (see the Introduction) — a
+  //    solid fill is a tinted 1×1 texture instead.
+  const stage = new Container();
+  const white = makeWhiteTexture();
+  const square = new UiRect(white, { x: W / 2 - 40, y: H / 2 - 40, width: 80, height: 80, color: 0xffd700 });
+  stage.addChild(square);
+
+  // 3. ONE frame loop drives everything — sim (if you have one), scene
+  //    mutation, and the render call. See "Concepts › Rendering".
+  startFrameLoop({
+    gl,
+    onFrame: (now, dtMs) => {
+      square.rotation += dtMs * 0.001;
+      renderer.render({ container: stage });
+    },
+    onError: (error, stage) => console.error(`pixi-rn: ${stage}`, error),
+  });
+}
+
+export function Screen() {
+  return <GLView style={StyleSheet.absoluteFill} onContextCreate={onContextCreate} />;
+}
+```
+
+That's a renderer, a shape, and a loop — nothing else is required to get
+pixels moving. Everything past this point (layout, text, buttons, screens) is
+built the same way: retained pixi nodes, mutated from that one loop.
+
+## Next steps
+
+- **[Rendering](/docs/concepts/rendering)** — what `createRenderer` and
+  `startFrameLoop` are actually doing, and the failure modes they exist to
+  prevent.
+- **[Layout](/docs/concepts/layout)** — lay widgets out with flexbox instead
+  of hand-computed pixel positions.
+- **[UI Kit](/docs/ui/overview)** — buttons, sliders, scroll lists, and a
+  generic multi-layer screen root (`UiLayerStack`).
+- **[Testing](/docs/testing)** — exercise all of the above in Node, with no
+  device and no GL context at all.

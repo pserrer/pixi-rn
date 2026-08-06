@@ -1,0 +1,82 @@
+---
+title: Text
+description: BitmapText, synchronous measurement, and fitting a label to a locale's worst case.
+---
+
+`BitmapText` is the only text pixi can draw on this stack — `Text` and
+`HTMLText` both need DOM canvas/HTML rendering that doesn't exist here. That
+turns out to be an advantage: a bitmap font's advance widths are plain
+numbers, so a string's size is knowable **synchronously, with no native
+call**, which is what lets a label report its own size to
+[the flex pass](/docs/concepts/layout) like any other node.
+
+## Installing a font
+
+```tsx
+import { loadBitmapFont } from 'pixi-rn';
+
+await loadBitmapFont(require('./assets/font-atlas.png'), fontMetricsJson);
+```
+
+`fontMetricsJson` is a BMFont-JSON-shaped object (`GeneratedBitmapFont`) —
+`pages`, `chars`, `info`, `common`, `distanceField`. Bake the atlas as a
+**plain alpha mask, not MSDF**, if the font is pixel art: a distance field
+renders antialiased edges by design, which reads as blurry on crisp pixel
+glyphs.
+
+## Measuring
+
+```tsx
+import { measureText, fitFontSize } from 'pixi-rn';
+
+const { width, height } = measureText('SCORE', 12, 1); // fontSize, letterSpacing
+
+// The largest size at which EVERY string fits, or the smallest if none does —
+// for a label whose translation might run longer than the English original
+// it was tuned against.
+const size = fitFontSize([t('revive'), t('giveUp')], 140, [15, 13, 11]);
+```
+
+`measureText` has to agree with what pixi actually lays out (`xAdvance +
+letterSpacing` per character, counted after the last one too) — that's the
+whole contract a bitmap font measurement has to keep, since one number sizes
+a box and the other positions glyphs inside it.
+
+## Drawing it — `UiLabel`
+
+`UiLabel` (in [the UI kit](/docs/ui/overview)) is almost always what you
+actually want over a bare `createBitmapText` — it adds the classic 8-copy
+pixel outline (React Native has no `textShadow*` that renders here, and no
+canvas text-stroke either) and takes part in the flex pass, ellipsizing with
+`...` when the box it's handed is narrower than its natural width:
+
+```tsx
+import { UiLabel } from 'pixi-rn';
+
+const label = new UiLabel('SCORE', {
+  fontSize: 12,
+  letterSpacing: 1,
+  tint: 0xffd700,
+  outline: { color: 0x000000, width: 1 },
+  layout: { flexShrink: 1 },
+});
+```
+
+A bare label as the direct child of a flex **column** has no definite width
+to ellipsize against — wrap it in its own row (`flexDirection: 'row'`, both
+the row and the label carrying `flexShrink: 1`) to give it one.
+
+## Picking a legible outline colour
+
+```tsx
+import { autoOutlineColor } from 'pixi-rn';
+
+const outlineColor = autoOutlineColor(foregroundColor); // dark behind light text, light behind dark
+```
+
+A single fixed outline colour only works while every label using it is the
+same tone. `autoOutlineColor` picks by perceived luminance
+(`perceivedLuminance` is exported too, if you want the raw number) — dark
+behind a light foreground, light behind a dark one — so the same kit can draw
+light labels on a dark panel and dark labels on a cream one without either
+going invisible.

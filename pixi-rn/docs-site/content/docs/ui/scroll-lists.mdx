@@ -1,0 +1,56 @@
+---
+title: Scroll Lists
+description: UiScrollList — clipped, kinetic scrolling, driven from your own frame loop.
+---
+
+```tsx
+import { UiScrollList } from 'pixi-rn';
+
+const list = new UiScrollList({
+  layout: { width: 340, height: 500 }, // the viewport — content taller than this scrolls
+  content: { width: 340, gap: 4 }, // flex style for the content column rows are added to
+  clip: white, // a 1×1 white texture, stretched to the viewport as the clip mask
+  scrollbar: { texture: white, width: 4, color: 0xffd700, alpha: 0.8 },
+});
+
+for (const item of items) list.content.addChild(buildRow(item));
+```
+
+## Driving it
+
+Kinetic scrolling — a flick that keeps gliding under friction, a drag past
+either end that pulls against a rubber band and springs back — is **not**
+free. It has to be advanced every frame from your own loop:
+
+```tsx
+// inside your onFrame:
+list.update(dtMs);
+```
+
+Never from a `setInterval` of the list's own — a timer callback lands
+wherever the JS event queue puts it, which is squarely inside frames your
+renderer was due to draw.
+
+## Telling a flick apart from a tap
+
+```tsx
+row.on('pointertap', () => {
+  if (list.scrolled) return; // the gesture that just ended was a scroll
+  onRowPress(item);
+});
+```
+
+`list.scrolled` reports whether the gesture that just ended actually moved
+the list. Rows are typically `UiButton`s that stop propagation on
+`pointerdown`, so the list listens on the **capture** phase — it would
+otherwise only ever see presses that missed every row, which on a full list
+is almost never.
+
+## Why the mask is a `Sprite`
+
+`Graphics` is unusable on this stack (see the [Introduction](/docs/)), and
+pixi v8's `ScissorMask` is vestigial here — it carries no `MaskEffect`
+extension and no `scissorMask` pipe is ever selected. A plain `Sprite` mask
+resolves to `AlphaMask`, which runs through the filter system instead; it
+costs one offscreen pass while the list is on screen, in exchange for rows
+sliding smoothly under the clip edge instead of popping away from it.

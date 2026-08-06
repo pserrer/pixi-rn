@@ -42,6 +42,17 @@ const EVENT_TYPE: Record<NativePointerType, string> = {
   cancel: 'pointerupoutside',
 };
 
+/**
+ * Feeds a Pixi v8 `EventBoundary` from React Native's touch responder system
+ * — the only input source available, since there is no DOM for pixi's own
+ * `EventSystem` to attach to. Forward every `onResponderGrant`/`Move`/
+ * `Release`/`Terminate` (down/move/up/cancel) into `dispatch()`; hit-testing,
+ * `eventMode`, and capture/bubble all then behave exactly as they would in a
+ * browser.
+ *
+ * @param root The scene root pixi should hit-test against (usually your
+ *   stage).
+ */
 export function createNativeEventBridge(root: Container): NativeEventBridge {
   const boundary = new NativeEventBoundary(root);
   const pointers = new Map<number, { x: number; y: number }>();

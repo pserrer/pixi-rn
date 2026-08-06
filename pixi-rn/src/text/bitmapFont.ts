@@ -20,12 +20,12 @@
 //
 // ⚠️ adapter FIRST — Hermes/expo-gl compatibility before any pixi class is
 // evaluated.
-import './adapter';
+import '../core/adapter';
 import { BitmapFont, BitmapText, Cache, Texture } from 'pixi.js';
 import type { BitmapFontData } from 'pixi.js';
 
-import { loadSheet } from './textures';
-import { pixiRnFail, pixiRnTrace } from './log';
+import { loadSheet } from '../core/textures';
+import { pixiRnFail, pixiRnTrace } from '../core/log';
 
 /** The BMFont JSON shape emitted by a bitmap-font baker (see the game's
  *  scripts/gen-bitmap-font.mjs for one that keeps pixel glyphs crisp). */
@@ -73,6 +73,7 @@ export function fontFamily(): string {
   return fontName;
 }
 
+/** The size `measureText()` reports for a string at a given size/spacing. */
 export interface TextMetrics {
   width: number;
   height: number;
@@ -188,6 +189,7 @@ export function loadBitmapFont(atlasModule: number, metrics: GeneratedBitmapFont
   return loading;
 }
 
+/** Style options shared by `createBitmapText` and `UiLabel`. */
 export interface BitmapTextOptions {
   fontSize?: number;
   letterSpacing?: number;
@@ -195,6 +197,9 @@ export interface BitmapTextOptions {
   align?: 'left' | 'center' | 'right';
 }
 
+/** A plain `BitmapText` in the installed font — no pixel outline. `UiLabel`
+ *  is almost always the better choice (it adds the outline and takes part in
+ *  `applyFlexLayout`); reach for this only when you want a bare glyph run. */
 export function createBitmapText(text: string, opts: BitmapTextOptions = {}): BitmapText {
   const label = new BitmapText({
     text,

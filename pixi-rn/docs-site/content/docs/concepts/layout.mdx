@@ -1,0 +1,70 @@
+---
+title: Layout
+description: A hand-written flex subset for retained Pixi trees, and why it exists instead of @pixi/layout.
+---
+
+Pixi has no layout engine, and `@pixi/layout` isn't an option on this stack:
+it peer-depends on `yoga-layout@^3`, which ships **only** a WASM binary — and
+Hermes has no `WebAssembly` global, so importing it kills `renderer.init()`
+before the first frame.
+
+`applyFlexLayout` is a hand-written subset of the flex vocabulary instead —
+enough for a canvas game UI, deliberately no more.
+
+## Giving a node a style
+
+A node takes part in layout **only if it has a `.layout` style** — a plain
+`Container` with none is skipped whole-subtree. That's what lets a panel's
+nine-slice backdrop or a hand-positioned decoration sit alongside laid-out
+content without the pass fighting you over it.
+
+```tsx
+import { Container } from 'pixi.js';
+import { applyFlexLayout, type LayoutStyles } from 'pixi-rn';
+
+const row = new Container();
+row.layout = { flexDirection: 'row', gap: 8, padding: 12, alignItems: 'center' } satisfies LayoutStyles;
+row.addChild(iconSprite, labelNode);
+
+applyFlexLayout(row); // full measure + arrange
+```
+
+Call `applyFlexLayout` when the tree (or a node's content) actually changed —
+**not every frame**. It's a full measure-then-arrange pass; running it 60
+times a second is pure waste when nothing about the screen moved between
+frames.
+
+## Supported style vocabulary
+
+`width`/`height` (`number`, `'50%'`, `'auto'`), `flexDirection`
+(`row`/`column`), `justifyContent`, `alignItems`/`alignSelf` including
+`stretch`, `flex` (grow), `flexShrink`, `gap`, `padding*`, `margin*`, and
+`position: 'absolute'` with `left`/`top`/`right`/`bottom`.
+
+**Not** supported: wrapping, `flexBasis`, reverse directions,
+`space-around`. If you need one of these, it belongs in the pass itself
+rather than a workaround in a screen.
+
+## Making a node participate
+
+A leaf reports its own intrinsic content size and receives its final,
+resolved box through two hooks:
+
+```tsx
+class MyWidget extends Container {
+  measureLayout() {
+    return { width: 100, height: 40 }; // intrinsic size
+  }
+
+  applyLayout(width: number, height: number) {
+    // called with the FINAL resolved box — this is the only place it's safe
+    // to size a backdrop, resize a nine-slice, or reflow text.
+  }
+}
+```
+
+Every widget in [the UI kit](/docs/ui/overview) is built this way — a
+`UiPanel` resizes its nine-slice border from `applyLayout`, a `UiLabel`
+ellipsizes against the width it's handed there. Nothing paints at a size
+before `applyLayout` runs, which is exactly what lets a row stretch a panel
+or ellipsize a label after the fact instead of needing hand-tuned pixel maths.

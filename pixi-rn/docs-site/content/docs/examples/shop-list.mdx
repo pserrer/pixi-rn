@@ -1,0 +1,65 @@
+---
+title: A scrollable shop list
+description: Composing UiScrollList with UiButton rows, and telling a flick apart from a tap.
+---
+
+A scrollable catalogue is one of the more involved composites in a typical
+UI kit — this combines [`UiScrollList`](/docs/ui/scroll-lists),
+[`UiDecoratedBox`](/docs/ui/decorated-box) rows, and the
+`list.scrolled` guard that keeps a flick from also registering as a row tap.
+
+```tsx
+import { Container, Texture } from 'pixi.js';
+import { UiScrollList, UiDecoratedBox, UiRect, UiLabel, UiPanel, UiButton, createUiLayout } from 'pixi-rn';
+
+interface ShopItem {
+  name: string;
+  price: number;
+}
+
+function buildShopRow(white: Texture, rowBg: Texture, item: ShopItem, onBuy: (item: ShopItem) => void): Container {
+  const row = new UiDecoratedBox({
+    layout: { width: 340, height: 60, flexDirection: 'row', alignItems: 'center', padding: 12, gap: 12 },
+    decor: [new UiRect(white, { width: 1, height: 1, color: 0x241a12, alpha: 0.7 }), new UiPanel(rowBg, { inset: 10 })],
+  });
+
+  const label = new UiLabel(item.name, { fontSize: 13, tint: 0xffffff, layout: { flex: 1, flexShrink: 1 } });
+  const price = new UiLabel(`${item.price}`, { fontSize: 13, tint: 0xffd700 });
+  row.addChild(label, price);
+
+  // The whole row is the tap target — not just the price label.
+  return new UiButton({
+    width: 340,
+    height: 60,
+    content: row,
+    onPress: () => onBuy(item),
+    layout: { width: 340, height: 60 },
+  });
+}
+
+function buildShopList(white: Texture, rowBg: Texture, items: ShopItem[], onBuy: (item: ShopItem) => void) {
+  const list = new UiScrollList({
+    layout: { width: 340, height: 500 },
+    content: { width: 340, gap: 6 },
+    clip: white,
+    scrollbar: { texture: white, width: 4, color: 0xffd700, alpha: 0.8 },
+  });
+
+  for (const item of items) list.content.addChild(buildShopRow(white, rowBg, item, onBuy));
+  return list;
+}
+```
+
+The row is itself a `UiButton` — its `onPress` fires on `pointertap` the same
+as any other button. Because [`UiScrollList` listens on the capture
+phase](/docs/ui/scroll-lists) for its own drag handling, a genuine flick is
+caught by the list before a row's `pointerdown` even fires; a real tap passes
+straight through to the row underneath. The one thing worth guarding
+explicitly, if a row's own press handler needs to be extra careful, is
+checking `list.scrolled` before acting — useful when a press handler does
+something with side effects beyond a simple `onPress` (analytics, sound) that
+shouldn't fire on a gesture that only grazed the row while scrolling past it.
+
+Remember to advance the list every frame — see
+[Scroll Lists](/docs/ui/scroll-lists#driving-it) for why that has to come from
+your own loop, never a timer.

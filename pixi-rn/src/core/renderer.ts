@@ -14,7 +14,9 @@ import './adapter';
 import { Ticker, WebGLRenderer, type ICanvas } from 'pixi.js';
 import { pixiRnFail, pixiRnTrace } from './log';
 
-// Minimal surface the renderer needs from the host GL context/view.
+/** Minimal surface `createRenderer` needs from the host GL context/view — an
+ *  expo-gl context satisfies this structurally; no import of `expo-gl`'s own
+ *  types required. */
 export interface GLLike {
   drawingBufferWidth: number;
   drawingBufferHeight: number;
@@ -45,6 +47,18 @@ export interface RendererOptions {
   backgroundColor?: number;
 }
 
+/**
+ * Builds a pixi v8 `WebGLRenderer` bound to an expo-gl context — the one
+ * entry point that does all of it: forces the WebGL2 backend expo-gl
+ * actually provides (see `core/adapter.ts`), guards `gl.getParameter` against
+ * expo-gl's reject list, parks pixi's shared tickers so nothing outside your
+ * own frame loop can start a background rAF, and constructs the renderer
+ * against the given logical size.
+ *
+ * @param gl A live expo-gl context, from `GLView`'s `onContextCreate`.
+ * @param options Logical size and clear colour.
+ * @returns A renderer ready for `renderer.render({ container: stage })`.
+ */
 export async function createRenderer(gl: GLLike, options: RendererOptions): Promise<WebGLRenderer> {
   const { width: W, height: H, backgroundColor = 0x50bbff } = options;
   pixiRnTrace('renderer-init', describeGlCapabilities(gl));

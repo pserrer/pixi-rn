@@ -1,0 +1,68 @@
+---
+title: A title screen
+description: Composing UiDecoratedBox, UiLabel and UiButton into one flex-laid-out screen.
+---
+
+A self-contained screen builder — the shape almost every screen in a
+retained-Pixi UI takes: a background panel, a title, and a call to action,
+laid out with [flexbox](/docs/concepts/layout) rather than hand-computed
+pixel positions.
+
+```tsx
+import { Container } from 'pixi.js';
+import { createUiLayout, UiDecoratedBox, UiLabel, UiButton, UiPanel, UiRect, autoOutlineColor } from 'pixi-rn';
+
+interface Assets {
+  white: import('pixi.js').Texture;
+  panel: import('pixi.js').Texture;
+  button: import('pixi.js').Texture;
+}
+
+function buildTitleScreen(assets: Assets, onPlay: () => void): Container {
+  const root = createUiLayout(
+    { width: 390, height: 844, alignItems: 'center', justifyContent: 'center', gap: 24 },
+    'title-screen',
+  );
+
+  const board = new UiDecoratedBox({
+    layout: { width: 320, alignItems: 'center', gap: 12, padding: 24 },
+    decor: [
+      new UiRect(assets.white, { width: 1, height: 1, color: 0x1a1410, alpha: 0.9 }),
+      new UiPanel(assets.panel, { inset: 24 }),
+    ],
+  });
+
+  const titleColor = 0xffd700;
+  board.addChild(
+    new UiLabel('OWSLEY’S ODYSSEY', {
+      fontSize: 20,
+      tint: titleColor,
+      align: 'center',
+      outline: { color: autoOutlineColor(titleColor) },
+      layout: { flexShrink: 1 },
+    }),
+  );
+
+  const playButton = new UiButton({
+    width: 220,
+    height: 56,
+    pressedOffset: 2,
+    onPress: onPlay,
+    content: new UiPanel(assets.button, { width: 220, height: 56, inset: 10 }),
+    layout: { width: 220, height: 56 },
+  });
+  const playLabel = new UiLabel('PLAY NOW', { fontSize: 16, tint: 0xffffff, align: 'center' });
+  playLabel.applyLayout(220);
+  playLabel.position.set(0, Math.round((56 - 16) / 2));
+  playButton.visual.addChild(playLabel);
+
+  board.addChild(playButton);
+  root.addChild(board);
+  return root;
+}
+```
+
+Wire it into [`UiLayerStack`](/docs/ui/layer-stack) as the `screen` layer's
+content, and it's a full, tappable title screen — its background sized
+correctly the first time `applyFlexLayout` runs on it, no manual measurement
+anywhere.

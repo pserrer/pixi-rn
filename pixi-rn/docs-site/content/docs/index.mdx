@@ -1,0 +1,59 @@
+---
+title: Introduction
+description: pixi.js v8 inside React Native, on expo-gl.
+---
+
+**pixi-rn** puts pixi.js **v8** to work inside React Native, on `expo-gl` —
+renderer bring-up, texture upload, bitmap text, native touch → Pixi events, a
+small flex layout pass, and a retained UI widget kit built on top of it.
+
+It was extracted from a shipping game after each of the failures below cost a
+device build to even _observe_. They are all silent: a black `GLView`, a dead
+process, or a control drawn where nothing can tap it.
+
+## Why this exists
+
+Pixi assumes a browser. React Native has no DOM, no `new Function` (Hermes),
+and `expo-gl` is an ES3 context wearing a WebGL costume that fits badly in
+three specific places. Getting a v8 renderer up is not "call `app.init()`".
+
+### The one that matters most
+
+Pixi v8 picks its backend with:
+
+```js
+webGLVersion = gl instanceof ADAPTER.getWebGLRenderingContext() ? 1 : 2;
+```
+
+That's correct in a browser, where `WebGL2RenderingContext` is an unrelated
+interface. **expo-gl deliberately makes `WebGL2RenderingContext` extend
+`WebGLRenderingContext`**, so the plain global answers "yes, WebGL1" for a
+WebGL2 context and pixi silently runs its WebGL1 backend on ES3 — a backend
+that cannot work here at all (see [Rendering](/docs/concepts/rendering) for
+why). `createRenderer` answers the question pixi is actually asking.
+
+### The others
+
+- **`Ticker.shared`/`Ticker.system` are booby traps.** Three v8 singletons
+  park a listener on one during `renderer.init()`, and each starts its own
+  background `requestAnimationFrame` — running outside your `try`/`catch` and
+  outside any error boundary. `createRenderer` parks both tickers first.
+- **No `Graphics`, no `Texture.WHITE`, no pixi `Text`.** All three lazily
+  rasterize a 2D canvas, which doesn't exist here. Solid colour is a tinted
+  1×1 buffer texture (`makeWhiteTexture`); 9-slice is `UiPanel`
+  (`NineSliceSprite`, mesh-based, safe); text is `UiLabel` (`BitmapText`).
+- **`gl.getParameter` throws** for the object-binding pnames EXGL never
+  implemented. `createRenderer` guards it.
+
+## Where to go next
+
+- **[Getting Started](/docs/getting-started)** — install the package, get a
+  coloured square on screen, and drive it from one frame loop.
+- **[Concepts](/docs/concepts/rendering)** — how the renderer, layout, text and
+  input pieces fit together, and why each one is shaped the way it is.
+- **[UI Kit](/docs/ui/overview)** — the retained widgets: buttons, sliders,
+  scroll lists, and `UiLayerStack`, the generic screen-swap primitive.
+- **[Examples](/docs/examples/title-screen)** — a few complete screens built
+  from the primitives above.
+- **[API Reference](/api/)** — every exported symbol, generated from its own
+  doc comments.

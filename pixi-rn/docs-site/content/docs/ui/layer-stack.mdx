@@ -1,0 +1,100 @@
+---
+title: UiLayerStack
+description: A generic, snapshot-driven, multi-layer screen root — the screen-swap pattern almost every retained-Pixi UI needs.
+---
+
+Retained Pixi UI raises the same problem in every app built on it: you need
+an ORDERED set of persistent layers (a HUD, a modal screen on top of it, a
+transient toast on top of that), each rebuilt only when the data driving it
+changes, with a shared press-absorbing blocker so a tap that misses every
+control on a modal layer doesn't fall through to whatever's underneath.
+`UiLayerStack` is that primitive, extracted from a shipping game's own
+hand-rolled version of exactly this.
+
+## Declaring the stack
+
+```tsx
+import { UiLayerStack } from 'pixi-rn';
+
+const ui = new UiLayerStack({
+  width: 390,
+  height: 844,
+  // Paint order: hud is bottom, screen sits over it, overlay is topmost.
+  // Only `screen` is modal — a HUD counter must never block a press by
+  // itself.
+  layers: [{ name: 'hud' }, { name: 'screen', blocking: true }, { name: 'overlay' }],
+});
+
+stage.addChild(ui.root);
+```
+
+Declaration order **is** paint order — the same order `Container.addChild`
+would give the layers. A shared blocker sits at the very bottom of the whole
+stack (so every declared layer is hit-tested before it, regardless of which
+one is modal) and activates automatically whenever any layer marked
+`blocking: true` currently has content.
+
+## Driving it every frame
+
+```tsx
+const hud = ui.update('hud', snapshot, (s) => (inRun ? new Hud(s) : null), dtMs);
+hud?.setLiveStats(state); // per-frame values that skip the identity-gated rebuild — see below
+ui.update('screen', snapshot, (s) => buildScreenFor(s), dtMs);
+ui.update('overlay', snapshot, (s) => buildToastFor(s), dtMs);
+```
+
+`build` is only called when the layer's `key` argument is a **different
+object** than last time — an O(1) identity check, not a deep comparison.
+That's deliberate: hand in a fresh object per render (a React component's
+render output is the obvious source) and never mutate one afterwards, and
+`!==` becomes exactly "did the host re-render?" — no allocation, and it can't
+miss a change the way field-by-field diffing can. Passing the **same**
+`snapshot` object to all three `update()` calls (as above) rebuilds all three
+layers together, atomically, exactly when it changes.
+
+Each layer also walks its own freshly-rebuilt tree for
+[`UiScrollList`s](/docs/ui/scroll-lists) and drives them every frame, so a
+host never has to track that set itself.
+
+## Live values that skip the rebuild
+
+`update()` returns the layer's current content — rebuilt or not — so a host
+that needs a typed handle for a value that changes every frame (a HUD's live
+metre/coin counters, moving several times a second) can keep it and write
+into it directly:
+
+```tsx
+class Hud extends Container {
+  setLiveStats(state: GameState) {
+    this.coins.setText(String(state.coinCount)); // no rebuild, no layout pass
+  }
+}
+```
+
+Routing a value like that back through the snapshot instead — rebuilding the
+whole layer on every tick — is the mistake this return value exists to make
+easy to avoid.
+
+## Animating a layer directly
+
+```tsx
+const overlay = ui.layer('overlay');
+overlay.pivot.set(W / 2, H / 2);
+overlay.position.set(W / 2, H / 2);
+
+// each frame, e.g. for a countdown pop-in:
+overlay.scale.set(1 + growAmount);
+```
+
+`layer(name)` returns a layer's own **persistent** container — stable for the
+stack's lifetime, independent of whatever content gets rebuilt into it. Use
+it for anything that needs to move or animate the layer itself rather than
+its content.
+
+## When it doesn't fit
+
+`UiLayerStack` covers the common case: one shared blocker, one flat list of
+named layers. If part of your UI needs a different shape — say, a blocker
+that should sit **between** two specific layers rather than beneath all of
+them — compose the individual primitives (`applyLayout`, `UiScrollList`
+collection) directly instead of fighting the stack's assumptions.

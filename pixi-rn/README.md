@@ -1,11 +1,11 @@
 # pixi-rn
 
 pixi.js **v8** inside React Native, on `expo-gl` — renderer bring-up, texture
-upload, bitmap text, and a seam that lets pixi draw your UI while React Native
-keeps layout and input.
+upload, bitmap text, native touch → Pixi events, a small flex layout pass, and
+a retained UI widget kit built on top of it.
 
 Extracted from a shipping game after each of the failures below cost a device
-build to even *observe*. They are all silent: a black `GLView`, a dead process,
+build to even _observe_. They are all silent: a black `GLView`, a dead process,
 or a control drawn where nothing can tap it.
 
 ## Why this exists
@@ -19,7 +19,7 @@ specific places. Getting a v8 renderer up is not "call `app.init()`".
 Pixi v8 picks its backend with:
 
 ```js
-webGLVersion = gl instanceof ADAPTER.getWebGLRenderingContext() ? 1 : 2
+webGLVersion = gl instanceof ADAPTER.getWebGLRenderingContext() ? 1 : 2;
 ```
 
 That's correct in a browser, where `WebGL2RenderingContext` is an unrelated
@@ -33,8 +33,8 @@ That backend cannot work here. It rewires `gl.createVertexArray` and
 `getSupportedExtensions()` outright** and returns a bare `{}` — no entry points
 — for everything else. It throws during init, or calls a missing method on the
 first draw. Shim the extension back onto the native VAO methods and it's worse:
-pixi has already overwritten `gl.createVertexArray` with a call *into your
-shim*, and the two recurse until the stack overflows and Hermes takes the
+pixi has already overwritten `gl.createVertexArray` with a call _into your
+shim_, and the two recurse until the stack overflows and Hermes takes the
 process down.
 
 This package answers the question pixi is actually asking.
@@ -44,7 +44,7 @@ This package answers the question pixi is actually asking.
 - **`Ticker.shared` / `Ticker.system` are booby traps.** Three v8 singletons
   park a listener on one during `renderer.init()` — `SchedulerSystem`,
   `EventsTicker`, `CanvasObserver` — and each starts its own background rAF,
-  running outside your try/catch *and* outside any error boundary. A throw there
+  running outside your try/catch _and_ outside any error boundary. A throw there
   is an unattributable fatal. (`CanvasObserver` calls
   `canvas.getBoundingClientRect()` every frame, which no stub canvas has.) Both
   tickers are parked before init.
@@ -61,6 +61,28 @@ This package answers the question pixi is actually asking.
 
 ```sh
 npm install pixi-rn pixi.js expo-gl expo-asset
+```
+
+## Package layout
+
+One folder per concern, each with a barrel `index.ts` — everything below is
+also re-exported from the package root, so `import { ... } from 'pixi-rn'`
+is all a consumer ever needs:
+
+```
+src/
+  core/     adapter bring-up, renderer construction, the frame loop,
+            expo-gl texture upload, the diagnostics hook
+  input/    native touch → Pixi v8 federated events
+  text/     bitmap font install + synchronous JS measurement, fitFontSize
+  layout/   the flex layout pass (no Yoga/WASM — see below)
+  ui/       retained widgets built on layout + text: rect, image, panel,
+            label, padNumber, button, slider, scroll list, decoratedBox,
+            plus layerStack's UiLayerStack (a generic snapshot-driven,
+            multi-layer screen root) and color's outline-colour helpers
+testing/    an EXGL-faithful mock GL context for offline smoke tests
+docs-site/  the guide site (getting started, concepts, examples) — its own
+            Next.js + Fumadocs app; see its own README
 ```
 
 ## Renderer
@@ -83,7 +105,7 @@ import { createRenderer, loadSheet, makeWhiteTexture } from 'pixi-rn';
     };
     requestAnimationFrame(tick);
   }}
-/>
+/>;
 ```
 
 Textures upload through `expo-gl`'s `texImage2D(…, asset)` — the pixel data
@@ -99,8 +121,10 @@ an expo-gl app that is easy to get expensively wrong:
 const stop = startFrameLoop({
   gl,
   onFrame: (now, dtMs, stage) => {
-    stage('simulate'); world.step(dtMs);
-    stage('render');   renderer.render({ container: stage });
+    stage('simulate');
+    world.step(dtMs);
+    stage('render');
+    renderer.render({ container: stage });
   },
   onError: (error, stage) => showSomewhereVisible(`${stage}: ${error.message}`),
 });
@@ -118,65 +142,193 @@ const stop = startFrameLoop({
 - **One loop.** `createRenderer` parks pixi's shared tickers for the same reason,
   so everything that needs a frame runs off this one.
 
-## The UI seam
+## Input
 
-The interesting part. Pixi has **no layout engine**; React Native's flexbox is
-excellent and its touch handling is what users expect. So don't choose: RN keeps
-layout, text content and input, and publishes *what to draw and where*. Pixi
-draws it inside the frame it already renders.
+React Native's touch responder system is the only input source here — there is
+no DOM for Pixi's own `EventSystem` to listen to. `createNativeEventBridge`
+keeps pixi v8's federated `EventBoundary` semantics (normal `eventMode`,
+hit-testing, capture/bubble) and only adapts native pointer coordinates into it:
 
 ```tsx
-function Panel({ children }) {
-  const { ref, onLayout } = useChrome(
-    (x, y, w, h) => ({ kind: 'nine', tex: 'panel', x, y, w, h, inset: 8, corner: 16 }),
-    [],
-  );
-  return (
-    <View ref={ref} onLayout={onLayout} collapsable={false}>
-      <ChromeDepthProvider>{children}</ChromeDepthProvider>
-    </View>
-  );
-}
+const events = createNativeEventBridge(stage);
+// from your surface's responder handlers:
+events.dispatch({ type: 'down', x: touch.locationX, y: touch.locationY });
 ```
 
-The component renders a **transparent** `View` that holds its normal place in
-the flex layout. Nothing about your layout changes.
+Every widget in `ui/` (`UiButton`, `UiSlider`, `UiScrollList`, …) is built on
+plain `eventMode`/`pointertap`/`pointerdown` handlers, so this bridge is the
+only input plumbing a host ever has to write.
 
-### Four rules, each learned the hard way
+## Layout
 
-1. **Wrap children in `ChromeDepthProvider`.** Paint order comes from nesting
-   depth, not publication order — React runs effects *child-first*, so a
-   container publishes *after* the content inside it. Without this, panels paint
-   over their own contents.
-2. **Call `bumpChromeLayout()` when something moves a screen without resizing
-   it.** `onLayout` fires when a view's own box changes, *not* when it merely
-   moves because an ancestor did. A late safe-area inset, a screen parking
-   off-screen — the art stays behind while the touch targets slide away.
-3. **Wrap scrollers in `useChromeScrollRegion()`.** A scroll is the one mover a
-   bump can't fix; the region reports one offset per scroll event and the layer
-   applies it as a delta, then clips to the viewport.
-4. **You will miss a mover.** That list is unbounded — so `tickChromeSweep()`
-   re-measures one element per frame, round-robin, and any drift self-corrects
-   within about a second whatever caused it. Call it from your frame loop.
+Pixi has no layout engine, and `@pixi/layout` isn't an option here: it
+peer-depends on `yoga-layout@^3`, which ships only a WASM binary, and Hermes
+has no `WebAssembly` global — importing it kills `renderer.init()` before the
+first frame.
+
+`applyFlexLayout` is a hand-written subset of the flex vocabulary instead —
+`width`/`height` (number, `%`, `auto`), row/column, `justifyContent`,
+`alignItems`/`alignSelf` including `stretch`, `flex` (grow), `flexShrink`,
+`gap`, padding, margin, and `position: 'absolute'`. Not supported: wrapping,
+`flexBasis`, reverse directions, `space-around`.
+
+```tsx
+container.layout = { flexDirection: 'row', gap: 8, padding: 12, alignItems: 'center' };
+applyFlexLayout(root); // full measure + arrange — call on rebuild, not per frame
+```
+
+A node only takes part in layout if it _has_ a `layout` style — a plain
+`Container` with none is skipped whole-subtree, which is how you hand-position
+decoration inside an otherwise-laid-out tree.
+
+## The UI widget kit
+
+Retained, canvas-free primitives — `Graphics`, `Text` and `Texture.WHITE` all
+need a DOM canvas this stack doesn't have, so callers provide uploaded
+textures (including a 1×1 white one from `makeWhiteTexture()` for solid fills).
+Every widget reports its size to `applyFlexLayout` via `measureLayout()` and
+receives its final box via `applyLayout()` — nothing paints at a size before
+that, which is what lets a row stretch a panel or ellipsize a label after the
+fact.
+
+| Widget           | What it is                                                            |
+| ---------------- | --------------------------------------------------------------------- |
+| `UiRect`         | a tinted 1×1 texture — the only solid fill available                  |
+| `UiImage`        | a sprite at an exact destination size                                 |
+| `UiPanel`        | a nine-slice panel (`NineSliceSprite`, mesh-based — safe here)        |
+| `UiLabel`        | a `BitmapText` label with the classic 8-copy pixel outline            |
+| `UiPadNumber`    | a fixed-width, zero-padded counter (dimmed leading zeros) — see below |
+| `UiButton`       | a hit rectangle that follows its resolved box, press/release/tap      |
+| `UiSlider`       | horizontal drag, reports its value once per gesture (see below)       |
+| `UiScrollList`   | a clipped, kinetically-scrolling vertical list                        |
+| `UiDecoratedBox` | a flex box with resizable background layers — see below               |
+
+`UiSlider.onValueChange` fires **once, when the gesture ends** — not on every
+move. A host that turns a live value into React state will re-render, and a
+retained UI rebuilt mid-gesture destroys the slider along with its pointer
+capture; reporting continuously would also put a full host render between every
+pair of move events.
+
+`UiScrollList` needs a frame tick to advance its kinetic glide —
+`list.update(dtMs)`, called from your own loop, never from a `setInterval` of
+its own (a timer callback lands wherever the queue puts it, squarely inside
+frames the renderer was due to draw).
+
+### `UiPadNumber` — a live counter that never triggers layout
+
+The arcade-odometer HUD idiom: a fixed-width, zero-padded counter whose
+leading zeros draw dimmer than the significant digits.
+
+```tsx
+const score = new UiPadNumber({ digits: 5, suffix: 'm', fontSize: 18, color: 0xffd700, leadColor: 0x8b90a0 });
+score.set(1204); // draws "01204m", the "0" dim and "1204m" bright
+```
+
+The font is fixed-advance, so the padded string's rendered width never changes
+with the value — `set()` only touches the two digit runs' text (`UiLabel`'s
+own identity guard early-outs when a run didn't change) and never triggers a
+flex layout pass. That is the whole reason to reach for this over a plain
+`UiLabel` for a value that updates every frame: a counter driven through
+ordinary React-style rebuilds would re-measure and re-arrange its row on every
+tick, and a neighbouring control would visibly twitch as digits rolled over.
+
+### `UiDecoratedBox` — panels with a resizable background
+
+A background can't be an ordinary flow child: it has to cover whatever box the
+flow children end up defining, which is only known after layout runs, not
+before. `UiDecoratedBox` is the general form of the trick `UiPanel` already
+uses for its own nine-slice border — one or more `UiDecoration`s (anything
+with a `resize(width, height)` method; `UiRect`, `UiImage` and `UiPanel` all
+already qualify) that sit in a plain, layout-less child and get resized once
+the box's own layout is final:
+
+```tsx
+const card = new UiDecoratedBox({
+  layout: { padding: 12, gap: 6 },
+  decor: [new UiRect(white, { width: 1, height: 1, color: 0x1a1410 }), new UiPanel(frameTexture, { inset: 8 })],
+});
+card.addChild(someLabel, someRow); // ordinary flow children, laid out as usual
+```
+
+### `UiLayerStack` — the screen-swap pattern
+
+The other piece almost every retained-Pixi UI needs: an ORDERED set of
+persistent layers (a HUD, a modal screen on top of it, a transient toast on
+top of that), each rebuilt only when the data driving it changes, with a
+shared press-absorbing blocker so a tap that misses every control on a modal
+layer doesn't fall through to whatever the host mounts underneath.
+
+```tsx
+const ui = new UiLayerStack({
+  width: W,
+  height: H,
+  // paint order: hud is bottom, screen sits over it, overlay is topmost.
+  // only `screen` is modal — a HUD counter never blocks a press by itself.
+  layers: [{ name: 'hud' }, { name: 'screen', blocking: true }, { name: 'overlay' }],
+});
+stage.addChild(ui.root);
+
+// once per frame, however your data arrives — each layer keyed by whatever
+// identity should trigger ITS rebuild (often the same snapshot for all three):
+const hud = ui.update('hud', snapshot, (s) => (inRun ? new Hud(s) : null), dtMs);
+ui.update('screen', snapshot, (s) => buildScreenFor(s), dtMs);
+ui.update('overlay', snapshot, (s) => buildToastFor(s), dtMs);
+```
+
+`build` is only called when the layer's `key` is a **different object** than
+last time — an O(1) identity check, not a deep comparison. That is deliberate:
+hand in a fresh object per render and never mutate one afterwards, and `!==`
+becomes exactly "the host re-rendered." Each layer also walks its own rebuilt
+tree for `UiScrollList`s and drives them every frame, so a host never has to
+track that set itself.
+
+`update()` returns the layer's current content, so a host that needs a typed
+handle for a value that updates every frame _without_ going through the
+identity-gated rebuild — a HUD's live metre/coin counters, say — can keep it
+and write into it directly, bypassing `build` entirely on the frames nothing
+structural changed. `layer(name)` returns a layer's own PERSISTENT container
+(stable for the stack's lifetime, independent of whatever content is rebuilt
+into it) for a host that wants to animate the layer itself — position it,
+scale it for a pop-in — rather than its rebuilt content.
 
 ## Text
 
 `BitmapText` is the only text pixi can draw here — but that's an advantage: a
 bitmap font's advance widths are plain numbers, so `measureText()` returns a
 label's exact size **synchronously, with no native call**. That's what lets a
-text component size its own `View` and keep flex layout working.
+text component size its own layout box while React Native (or `applyFlexLayout`
+above) keeps the rest of the layout working.
 
 ```tsx
-installBitmapFont(atlas, metrics);   // metrics = BMFont JSON
-<PixelText text="SCORE" color="#FFD700" style={{ fontSize: 12, letterSpacing: 1 }} />
+installBitmapFont(atlas, metrics); // metrics = BMFont JSON
+const label = new UiLabel('SCORE', { fontSize: 12, letterSpacing: 1, outline: { color: 0x000000 } });
 ```
 
 ⚠️ Bake the atlas as a **plain alpha mask, not MSDF**, if your font is pixel art
 — a distance field renders antialiased edges by design.
 
 ⚠️ `measureText` must agree with pixi's own layout (`xAdvance` + `letterSpacing`
-per character, counted after the last one too), since one sizes the View and the
-other positions the glyphs.
+per character, counted after the last one too), since one sizes the label's box
+and the other positions the glyphs.
+
+### Two small helpers that come up in every pixel-art kit
+
+`fitFontSize(texts, maxWidth, sizes)` returns the largest of `sizes` at which
+**every** string in `texts` fits `maxWidth`, or the smallest when none does —
+for a label whose translation might be a lot longer in one locale than the
+English original it was tuned against:
+
+```tsx
+const size = fitFontSize([t('revive'), t('giveUp')], CARD_WIDTH, [15, 13, 11]);
+```
+
+`autoOutlineColor(foreground)` picks a legible pixel-outline colour for a
+foreground colour — dark behind light text, light behind dark text — by
+perceived luminance (`perceivedLuminance` is exported too, for anything that
+wants the raw number). A single fixed outline colour only works while every
+label in a kit is the same tone; the moment the same kit draws light labels on
+a dark panel AND dark labels on a cream one, a constant outline goes invisible
+on one of them.
 
 ## Testing without a device
 
@@ -195,6 +347,28 @@ const renderer = await createRenderer(gl, { width: 390, height: 844 });
 
 It can't tell you anything about pixels — but every failure listed at the top of
 this file is catchable with it, in seconds, instead of an EAS build.
+
+## API docs
+
+The full API reference is generated with [TypeDoc](https://typedoc.org) from
+the doc comments on every exported symbol — this README becomes its homepage
+(`typedoc.json`'s `readme` option), so it's one static site covering both the
+guide and the reference.
+
+```sh
+npm run docs                    # from packages/pixi-rn
+npm run docs:pixi-rn            # from the repo root
+```
+
+Outputs a self-contained static site to `packages/pixi-rn/docs/` (gitignored —
+regenerate it rather than committing it); open `docs/index.html`, or serve it
+with anything that serves static files (`npx serve docs`).
+
+For guides, concepts and worked examples beyond the type-level reference, see
+[`docs-site/`](./docs-site) — a [Fumadocs](https://fumadocs.dev) site
+(`npm run docs:site` from the repo root) that also embeds this generated
+reference at `/api/`. It lives inside this package (not beside it) so that
+mirroring `packages/pixi-rn` alone still carries the whole docs site with it.
 
 ## Licence
 

@@ -23,8 +23,10 @@ import {
 import { Asset } from 'expo-asset';
 import { pixiRnFail, pixiRnTrace } from './log';
 
-// Uploads a bundled image via expo-gl's texImage2D(…, asset) overload. The
-// pixel data never round-trips through JS.
+/** A pixi `TextureSource` backed by an `expo-asset` `Asset`, uploaded through
+ *  expo-gl's `texImage2D(…, asset)` overload — the pixel data never
+ *  round-trips through JS. Built by `loadSheet`; construct one directly only
+ *  if you already have a downloaded `Asset`. */
 export class ExpoAssetSource extends TextureSource<Asset> {
   uploadMethodId = 'expo-asset';
 
@@ -82,10 +84,17 @@ extensions.add(expoAssetUploader);
 // incomplete texture = samples opaque black. Verified good on-device for
 // bundled + OTA assets (PR #132's asset diagnostics).
 //
-// `label` is deliberately a human-readable asset name rather than relying on
-// Metro's opaque numeric module ID. A native asset-loader crash cannot be
-// caught by JS, so the last persisted `load-sheet:start` is the only useful
-// clue after the app restarts.
+/**
+ * Downloads a bundled/OTA image asset and uploads it as a pixi `Texture`,
+ * through expo-gl — the RN replacement for pixi's own `Assets.load` (which
+ * needs DOM image decoding this platform doesn't have).
+ *
+ * @param label A human-readable name, deliberately not Metro's opaque numeric
+ *   module id: a native asset-loader crash can't be caught by JS, so the last
+ *   persisted `load-sheet:start` trace is the only clue after the app
+ *   restarts (route diagnostics through `setPixiRnLogger`).
+ * @param mod The `require(...)`d module id for the image.
+ */
 export async function loadSheet(label: string, mod: number): Promise<Texture> {
   pixiRnTrace('load-sheet:start', { label, mod });
   try {
@@ -100,9 +109,11 @@ export async function loadSheet(label: string, mod: number): Promise<Texture> {
   }
 }
 
-// 1×1 white texture for solid tinted rects (dims, sky fills, hole shadow).
-// NOT Texture.WHITE: that lazily rasterizes a 2D canvas, which doesn't exist
-// here (see adapter.ts).
+/**
+ * A 1×1 opaque-white texture, for solid tinted fills (`UiRect`, dims, a sky
+ * colour). NOT pixi's `Texture.WHITE` — that lazily rasterizes a 2D canvas,
+ * which doesn't exist on this platform (see `core/adapter.ts`).
+ */
 export function makeWhiteTexture(): Texture {
   return new Texture({
     source: new BufferImageSource({

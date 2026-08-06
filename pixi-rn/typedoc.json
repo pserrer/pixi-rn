@@ -1,0 +1,22 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/index.ts"],
+  "tsconfig": "./tsconfig.json",
+  "out": "docs",
+  "name": "pixi-rn",
+  "readme": "README.md",
+  "includeVersion": true,
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "excludeExternals": true,
+  "categorizeByGroup": true,
+  "navigation": {
+    "includeCategories": true,
+    "includeGroups": true
+  },
+  "sort": ["source-order"],
+  "titleLink": "https://github.com/pserrer/game/tree/main/packages/pixi-rn",
+  "navigationLinks": {
+    "GitHub": "https://github.com/pserrer/game/tree/main/packages/pixi-rn"
+  }
+}

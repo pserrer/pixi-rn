@@ -1,0 +1,110 @@
+---
+title: Rendering
+description: createRenderer, startFrameLoop, and the expo-gl-specific traps they exist to avoid.
+---
+
+## `createRenderer`
+
+```tsx
+import { createRenderer } from 'pixi-rn';
+
+const renderer = await createRenderer(gl, {
+  width: 390,
+  height: 844,
+  // A distinctive value doubles as a diagnostic: if the screen turns THIS
+  // colour, presentation works and the bug is in your draw path.
+  backgroundColor: 0x50bbff,
+});
+```
+
+`createRenderer` is the one entry point that gets pixi v8 working on
+`expo-gl` at all. Importing `pixi-rn` (from anywhere) installs a DOM adapter
+as a side effect — before any pixi class is touched — which:
+
+- **Forces the WebGL2 backend.** expo-gl deliberately makes
+  `WebGL2RenderingContext` extend `WebGLRenderingContext` (unlike a browser),
+  so pixi's own `instanceof` backend check silently answers "WebGL1" for a
+  WebGL2 context. WebGL1 cannot work here at all — EXGL removes the VAO
+  extension it needs outright. `createRenderer` answers pixi's actual
+  question correctly instead.
+- **Stubs the DOM** just enough for pixi's browser-shaped internals
+  (`EventSystem`, a fake `<canvas>`) to run harmlessly, without ever touching
+  a real 2D context.
+- **Guards `gl.getParameter`** against the object-binding pnames expo-gl never
+  implemented (it throws instead of returning `null` like a browser would).
+- **Parks `Ticker.shared`/`Ticker.system`** before `renderer.init()` — three
+  pixi v8 singletons park a listener on one of them during init, and each
+  spins up its OWN background `requestAnimationFrame`, running outside your
+  `try`/`catch` and outside any error boundary. One throw there is an
+  unattributable crash. Parking both tickers means everything that needs a
+  frame has to come through your own loop instead (see below) — a pixi
+  feature that relies on a shared ticker (`AnimatedSprite`'s `autoUpdate`, a
+  `VideoSource`) won't advance on its own; drive it from your own `onFrame`.
+
+## `startFrameLoop`
+
+```tsx
+const stop = startFrameLoop({
+  gl,
+  onFrame: (now, dtMs, stage) => {
+    stage('simulate');
+    world.step(dtMs);
+    stage('render');
+    renderer.render({ container: stage });
+  },
+  onError: (error, stage) => showSomewhereVisible(`${stage}: ${error.message}`),
+});
+// later: stop();
+```
+
+One `requestAnimationFrame`, owned in one place — small, but easy to get
+expensively wrong on this platform:
+
+- **A rAF callback has no error boundary.** React can't catch it and neither
+  can the host — an uncaught throw takes the whole process down with a stack
+  that names nothing. Worse, without stopping, a throwing frame throws again
+  every ~16ms and buries the original error. `stage()` records what the
+  callback was doing when it threw; the loop catches, reports via `onError`,
+  and stops.
+- **expo-gl only presents when you say so.** Forgetting `gl.endFrameEXP()` is
+  a permanently black surface with no error anywhere — the loop calls it (and
+  `gl.flush()`) after every `onFrame`.
+- **`dtMs` is clamped** (100ms by default) so a GC pause or the app
+  backgrounding doesn't teleport a simulation through a wall; the true,
+  unclamped gap comes alongside as `rawMs` for measurement.
+
+## Uploading textures
+
+```tsx
+import { loadSheet, makeWhiteTexture, makeSlicer } from 'pixi-rn';
+
+const atlas = await loadSheet('atlas', require('./assets/atlas.png'));
+const white = makeWhiteTexture();
+const slice = makeSlicer();
+const iconFrame = slice(atlas, { x: 0, y: 0, w: 16, h: 16 });
+```
+
+Pixi's own `Assets` loader needs DOM image decoding (`HTMLImageElement`,
+`createImageBitmap`), which React Native doesn't have. `loadSheet` resolves a
+`require(...)`d image through `expo-asset` and uploads it via expo-gl's
+`texImage2D(…, asset)` overload instead — the pixel data never round-trips
+through JS. `makeSlicer()` returns a function that caches sub-rect `Texture`s
+by the **object identity** of the rect you pass in, so reuse the same rect
+instance across frames/rebuilds rather than constructing a fresh literal each
+time — a fresh object every call leaks a `Texture` per call.
+
+## Diagnostics
+
+```tsx
+import { setPixiRnLogger } from 'pixi-rn';
+
+setPixiRnLogger({
+  trace: (stage, detail) => persistTrace(stage, detail),
+  fail: (stage, error) => persistFailure(stage, error),
+});
+```
+
+Every failure mode above is the silent kind, so the package traces its own
+boundaries (renderer bring-up, texture/font loads, frame-loop failures) —
+`setPixiRnLogger` lets a host route those somewhere more durable than the
+console, so a trace survives a native crash the JS side never saw coming.

@@ -51,6 +51,8 @@ export interface LayoutStyles {
   display?: 'none' | 'flex';
 }
 
+/** A resolved or intrinsic width/height, as reported by `measureLayout()` or
+ *  read back from `layoutSize()`. */
 export interface LayoutSize {
   width: number;
   height: number;

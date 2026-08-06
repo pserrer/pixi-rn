@@ -1,0 +1,59 @@
+---
+title: Overview
+description: Retained, canvas-free primitives that all participate in the same flex layout pass.
+---
+
+`Graphics`, `Text` and `Texture.WHITE` all create or depend on a DOM canvas,
+so none are usable on this stack (see the [Introduction](/docs/)) — every
+widget below draws with uploaded textures and pixi's mesh-based primitives
+instead. Every one of them reports its size to
+[`applyFlexLayout`](/docs/concepts/layout) via `measureLayout()` and receives
+its final box via `applyLayout()`, so a row can stretch a panel or ellipsize a
+label after the fact, and a control's hit area always matches what's actually
+on screen.
+
+| Widget           | What it is                                                             |
+| ---------------- | ----------------------------------------------------------------------- |
+| `UiRect`         | a tinted 1×1 texture — the only solid fill available                    |
+| `UiImage`        | a sprite at an exact destination size                                   |
+| `UiPanel`        | a nine-slice panel (`NineSliceSprite`, mesh-based — safe here)          |
+| `UiLabel`        | a `BitmapText` label with the classic 8-copy pixel outline              |
+| `UiPadNumber`    | a fixed-width, zero-padded counter — [dedicated page](/docs/ui/pad-number) |
+| `UiButton`       | a hit rectangle that follows its resolved box — [page](/docs/ui/buttons-and-sliders) |
+| `UiSlider`       | a horizontal drag control — [page](/docs/ui/buttons-and-sliders) |
+| `UiScrollList`   | a clipped, kinetically-scrolling list — [dedicated page](/docs/ui/scroll-lists) |
+| `UiDecoratedBox` | a flex box with resizable background layers — [dedicated page](/docs/ui/decorated-box) |
+| `UiLayerStack`   | a generic, snapshot-driven, multi-layer screen root — [dedicated page](/docs/ui/layer-stack) |
+
+## The basics
+
+```tsx
+import { Container } from 'pixi.js';
+import { createUiLayout, UiRect, UiImage, UiPanel, UiLabel, makeWhiteTexture } from 'pixi-rn';
+
+const white = makeWhiteTexture();
+
+// A tinted solid fill.
+const dim = new UiRect(white, { width: 390, height: 844, color: 0x000030, alpha: 0.6 });
+
+// A sprite at an exact size — pass an already-sliced texture for a sheet cell.
+const icon = new UiImage(coinTexture, { width: 24, height: 24 });
+
+// A nine-slice panel. `inset` is the source border width; `corner` (defaulting
+// to `inset`) is what pixi actually slices at.
+const panel = new UiPanel(panelTexture, { width: 300, height: 120, inset: 12 });
+
+// A label with the pixel outline.
+const title = new UiLabel('SHOP', { fontSize: 20, tint: 0xffd700, outline: { color: 0x000000 } });
+
+// A plain flex container — a named Container with a `.layout` style.
+const row = createUiLayout({ flexDirection: 'row', gap: 8, alignItems: 'center' }, 'my-row');
+row.addChild(icon, title);
+```
+
+`UiPanel` has one hard rule worth calling out: **never assign `.width`/
+`.height` directly** — always go through `.resize(width, height)` (which
+`applyLayout` already calls for you inside the flex pass). The border is
+clamped against the destination size as well as the source art; skipping
+`resize` leaves a stale clamp in place, which reads as a nine-slice whose
+corners have swollen into a smear.

@@ -1,0 +1,60 @@
+---
+title: Input
+description: Feeding a Pixi v8 EventBoundary from React Native's own touch responder system.
+---
+
+There is no DOM here for pixi's own `EventSystem` to listen to — input on
+this stack comes from React Native's touch responder system. `pixi-rn`
+bridges the two while keeping pixi v8's **federated `EventBoundary`**
+semantics intact: normal `eventMode`, hit-testing, capture, and bubbling all
+behave exactly as they would in a browser.
+
+## Wiring it up
+
+```tsx
+import { View, StyleSheet } from 'react-native';
+import { GLView } from 'expo-gl';
+import { createNativeEventBridge, type NativeEventBridge } from 'pixi-rn';
+
+let events: NativeEventBridge;
+
+// after building the scene:
+events = createNativeEventBridge(stage);
+
+function forward(type: 'down' | 'move' | 'up' | 'cancel', e: { nativeEvent: { locationX: number; locationY: number } }) {
+  events.dispatch({ type, x: e.nativeEvent.locationX, y: e.nativeEvent.locationY });
+}
+
+<View
+  style={StyleSheet.absoluteFill}
+  onStartShouldSetResponder={() => true}
+  onMoveShouldSetResponder={() => true}
+  onResponderGrant={(e) => forward('down', e)}
+  onResponderMove={(e) => forward('move', e)}
+  onResponderRelease={(e) => forward('up', e)}
+  onResponderTerminate={(e) => forward('cancel', e)}
+>
+  <GLView style={StyleSheet.absoluteFill} pointerEvents="none" onContextCreate={onContextCreate} />
+</View>;
+```
+
+The `GLView` itself takes `pointerEvents="none"` — the surrounding `View`'s
+responder handlers are what actually capture touches and forward them into
+the bridge.
+
+## Using it
+
+Once the bridge exists, every widget in [the UI kit](/docs/ui/overview) is
+built on pixi's own ordinary event API — no special-casing needed:
+
+```tsx
+button.eventMode = 'static';
+button.on('pointertap', () => console.log('tapped'));
+```
+
+`UiButton` calls `event.stopPropagation()` on press, so a control never lets
+its tap fall through to whatever sits behind it — usually the playfield, where
+an unhandled press means something game-specific (a jump, in the game this
+package was extracted from). Any full-screen modal should sit over a
+press-absorbing blocker for the same reason; see
+[`UiLayerStack`](/docs/ui/layer-stack), which does this automatically.

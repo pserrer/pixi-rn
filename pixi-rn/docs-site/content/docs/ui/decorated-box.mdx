@@ -1,0 +1,52 @@
+---
+title: UiDecoratedBox
+description: A flex box with resizable background layers — the general form of the trick UiPanel uses for its own border.
+---
+
+A background can't be an ordinary flow child of a flex layout: it has to
+cover whatever box the flow children end up defining, which is only known
+**after** layout runs, not before. `UiPanel` already solves this for its own
+nine-slice border; `UiDecoratedBox` is the same trick generalized to compose
+one or more background layers behind arbitrary content.
+
+## Building a panel with a background fill
+
+```tsx
+import { UiDecoratedBox, UiRect, UiPanel } from 'pixi-rn';
+
+const card = new UiDecoratedBox({
+  layout: { padding: 12, gap: 6 },
+  decor: [
+    new UiRect(white, { width: 1, height: 1, color: 0x1a1410 }), // a fill, drawn first (bottom)
+    new UiPanel(frameTexture, { inset: 8 }), // a frame over it, drawn second
+  ],
+});
+
+card.addChild(someLabel, someRow); // ordinary flow children, laid out as usual
+```
+
+`decor` layers draw back-to-front, entirely BEHIND whatever flow children get
+added afterward — they live in a plain child container with **no** `.layout`
+style, so [the flex pass](/docs/concepts/layout) skips that whole subtree and
+leaves them exactly where `resize()` puts them.
+
+## Writing your own decoration
+
+Anything with a `resize(width, height)` method qualifies — `UiRect`,
+`UiImage` and `UiPanel` all already have one (it's the same code their
+`applyLayout` calls). For anything more elaborate:
+
+```tsx
+import type { UiDecoration } from 'pixi-rn';
+import { Container } from 'pixi.js';
+
+class Gradient extends Container implements UiDecoration {
+  resize(width: number, height: number) {
+    // reposition/resize whatever child sprites make up the gradient
+  }
+}
+```
+
+`UiDecoratedBox` calls `resize()` on every decoration from its own
+`applyLayout` — the one hook that runs after the box's size is actually
+final, which is the whole point.

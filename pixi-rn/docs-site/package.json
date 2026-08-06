@@ -1,0 +1,30 @@
+{
+  "name": "pixi-rn-docs",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Guides, examples and API reference for pixi-rn — a static site, built with Fumadocs.",
+  "scripts": {
+    "dev": "next dev",
+    "prebuild": "node scripts/copy-api-docs.mjs",
+    "build": "next build",
+    "start": "next start",
+    "serve": "npx serve out"
+  },
+  "dependencies": {
+    "fumadocs-core": "^16.14.1",
+    "fumadocs-mdx": "^15.2.2",
+    "fumadocs-ui": "^16.14.1",
+    "next": "^16.3.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/mdx": "^2.0.14",
+    "@types/node": "^22.0.0",
+    "@types/react": "~19.2.2",
+    "@types/react-dom": "^19.2.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~6.0.3"
+  }
+}

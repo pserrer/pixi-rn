@@ -96,6 +96,9 @@ class ExpoCanvas implements ICanvas {
   }
 }
 
+/** A minimal `ICanvas` with no real 2D context — the DOM adapter's answer for
+ *  anywhere pixi asks to create or resolve a `<canvas>` on a platform with no
+ *  canvas. `getContext()` always returns `null`. */
 function fakeCanvas(width = 0, height = 0): ICanvas {
   return new ExpoCanvas(width, height);
 }
@@ -203,4 +206,7 @@ const expoAdapter: Adapter = {
 DOMAdapter.set(expoAdapter);
 
 export { fakeCanvas };
+/** Importing this module installs the DOM adapter as a side effect; this is
+ *  just something to import (or check) if you need to confirm that already
+ *  happened before touching a pixi class yourself. Always `true`. */
 export const pixiEnvReady = true;

@@ -1,0 +1,58 @@
+---
+title: Buttons & Sliders
+description: UiButton and UiSlider — hit areas that follow layout, and why a slider only reports once.
+---
+
+## `UiButton`
+
+```tsx
+import { UiButton, UiPanel } from 'pixi-rn';
+
+const button = new UiButton({
+  width: 120,
+  height: 44,
+  content: new UiPanel(buttonTexture, { width: 120, height: 44, inset: 10 }),
+  pressedOffset: 2, // px the visual moves down while held
+  onPress: () => console.log('pressed'),
+  layout: { width: 120, height: 44 },
+});
+```
+
+The hit rectangle is the button's own resolved box, so it has to follow
+layout — that's the whole reason `applyLayout` exists on it. A control that
+gets stretched or flexed but keeps its **constructed** hit rect is one that
+visibly moves but only reacts on part of itself; `UiButton` re-applies its
+hit area from `applyLayout` so this can't happen.
+
+`onPress` fires once per completed tap (`pointertap`), and every handler
+calls `event.stopPropagation()` — a button never lets a press fall through to
+whatever's behind it.
+
+## `UiSlider`
+
+```tsx
+import { UiSlider } from 'pixi-rn';
+
+const slider = new UiSlider({
+  width: 200,
+  height: 32,
+  value: 0.5,
+  track: trackTexture,
+  thumb: thumbTexture,
+  thumbWidth: 15,
+  thumbHeight: 40,
+  onValueChange: (value) => console.log('committed:', value),
+});
+```
+
+The thumb tracks the finger **live**, off the slider's own internal state.
+`onValueChange` fires **once, when the gesture ends** — not on every move.
+
+That's not a stylistic choice. A host that turns every intermediate value
+into React state will re-render on each move event, and a retained UI
+rebuilt mid-gesture destroys this slider — taking its pointer capture with
+it. Reporting on press has the same problem in miniature (the control that
+owned the pointer is gone by the time the state lands), and reporting
+continuously would put a full host render between every pair of move events
+regardless. Read the drag live off the widget itself if you need a
+value-while-dragging affordance; commit it through `onValueChange`.

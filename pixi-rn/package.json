@@ -27,5 +27,11 @@
     "pixi.js": "^8.0.0",
     "react": "*",
     "react-native": "*"
+  },
+  "devDependencies": {
+    "typedoc": "^0.28.0"
+  },
+  "scripts": {
+    "docs": "typedoc"
   }
 }

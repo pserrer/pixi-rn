@@ -1,0 +1,57 @@
+---
+title: Testing without a device
+description: An EXGL-faithful mock GL context, for exercising the real construction path in Node.
+---
+
+Every failure mode described in the [Introduction](/docs/) is silent on
+device — a black `GLView`, a dead process, no JS stack. `testing/mockExgl.mjs`
+ships with the package specifically so you don't need an EAS build (or any
+device at all) to catch them: it's a mock GL context faithful about the three
+things that actually break pixi v8 on expo-gl —
+
+- the `WebGL2 extends WebGL1` prototype chain,
+- `getExtension()` returning a bare `{}` instead of throwing,
+- and the `getParameter`/unimplemented-pname reject lists.
+
+## Constructing a renderer against it
+
+```js
+import { createMockExglContext } from 'pixi-rn/testing/mockExgl.mjs';
+import { createRenderer } from 'pixi-rn';
+
+const { gl } = createMockExglContext();
+const renderer = await createRenderer(gl, { width: 390, height: 844 });
+
+console.assert(renderer.context.webGLVersion === 2, 'picked the right backend');
+```
+
+From here you have a real pixi `WebGLRenderer` — build your actual scene
+against it, call `renderer.render({ container: stage })`, and inspect the
+result: walk the scene graph, check resolved `.layout` boxes after
+`applyFlexLayout`, dispatch synthetic input through
+[`createNativeEventBridge`](/docs/concepts/input), or drive
+[`UiScrollList.update(dtMs)`](/docs/ui/scroll-lists) across a handful of
+frames and assert on where it lands.
+
+## Inspecting what got drawn
+
+```js
+const { gl } = createMockExglContext({
+  onCall: (name, args) => {
+    if (name === 'shaderSource') console.log(args[1]); // the compiled GLSL
+  },
+});
+```
+
+Every GL call the renderer makes is observable through `onCall` — enough to
+assert a frame actually issued draw calls, batched the way you expect, or
+compiled the shader you expected it to.
+
+## What this can't tell you
+
+Nothing about actual pixels — there's no rasterizer here, only the call
+sequence a real one would receive. But every failure worth chasing on this
+stack is a **construction-time** or **call-sequence** failure (the wrong
+backend selected, a missing GL entry point, an unhandled exception during
+`renderer.init()`), and all of those are exactly what this catches, in
+milliseconds, instead of a multi-minute EAS build.
