@@ -395,6 +395,17 @@ export interface UiSliderOptions {
  * so the thumb stays responsive after the pointer leaves its hit area — the
  * native bridge must keep forwarding move/up events to the EventBoundary for
  * that to hold.
+ *
+ * ⚠️ `onValueChange` fires ONCE, when the gesture ENDS. The thumb tracks the
+ * finger live off the slider's own state; nothing is reported until release.
+ *
+ * That is not a stylistic choice. A host that turns the reported value into
+ * state will re-render, and a retained UI rebuilt from that render DESTROYS
+ * this slider mid-gesture — taking its pointer capture with it. Emitting on
+ * press made every drag die on its first frame: the press value landed and the
+ * control that owned the pointer no longer existed, which reads exactly like a
+ * tap-only slider. Reporting continuously would also put a full host render
+ * between every pair of move events.
  */
 export class UiSlider extends Container {
   readonly track: Sprite;
@@ -402,6 +413,9 @@ export class UiSlider extends Container {
   private readonly hit: Rectangle;
   private width_: number;
   private value = 0;
+  /** Value at the moment of the press, so a gesture that lands where it started
+   *  reports nothing. */
+  private pressedValue = 0;
   private activePointer: number | null = null;
   private onValueChange: ((value: number) => void) | undefined;
 
@@ -442,12 +456,12 @@ export class UiSlider extends Container {
     this.setValue(this.value);
   }
 
-  setValue(value: number, emit = false): this {
+  /** Moves the thumb. Silent by design — see the class note on why the host
+   *  only hears about a change once the gesture is over. */
+  setValue(value: number): this {
     const next = Math.min(1, Math.max(0, value));
-    const changed = next !== this.value;
     this.value = next;
     this.thumb.x = Math.round(this.travel() * next);
-    if (emit && changed) this.onValueChange?.(next);
     return this;
   }
 
@@ -467,6 +481,7 @@ export class UiSlider extends Container {
   private handleDown(event: FederatedPointerEvent): void {
     event.stopPropagation();
     this.activePointer = event.pointerId;
+    this.pressedValue = this.value;
     this.setFromEvent(event);
   }
 
@@ -481,12 +496,14 @@ export class UiSlider extends Container {
     event.stopPropagation();
     this.setFromEvent(event);
     this.activePointer = null;
+    // The whole gesture reports as one change — a tap and a drag alike.
+    if (this.value !== this.pressedValue) this.onValueChange?.(this.value);
   }
 
   private setFromEvent(event: FederatedPointerEvent): void {
     const local = this.toLocal(event.global);
     const travel = this.travel();
-    this.setValue(travel === 0 ? 0 : (local.x - this.thumb.width / 2) / travel, true);
+    this.setValue(travel === 0 ? 0 : (local.x - this.thumb.width / 2) / travel);
   }
 }
 
