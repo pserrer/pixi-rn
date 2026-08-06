@@ -1,0 +1,63 @@
+name: Deploy docs
+
+# Lives inside packages/pixi-rn so the subtree mirror carries it into the
+# public repo's own .github/workflows/ — it then runs as THAT repo's Actions,
+# using its own GITHUB_TOKEN (no cross-repo PAT needed), firing right after
+# the private repo's mirror workflow pushes new content to this repo's main.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pixi-rn deps
+        run: npm install
+
+      - name: Build API reference (TypeDoc)
+        run: npm run docs
+
+      - name: Install docs-site deps
+        run: npm install
+        working-directory: docs-site
+
+      - name: Build guide site (Fumadocs + embedded API reference)
+        run: npm run build
+        working-directory: docs-site
+        env:
+          # GitHub Pages serves a project site under /<repo>/, not the domain
+          # root — see docs-site/next.config.mjs for why this is conditional.
+          GH_PAGES_BASE_PATH: /${{ github.event.repository.name }}
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs-site/out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment

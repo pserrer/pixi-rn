@@ -15,8 +15,8 @@
     "includeGroups": true
   },
   "sort": ["source-order"],
-  "titleLink": "https://github.com/pserrer/game/tree/main/packages/pixi-rn",
+  "titleLink": "https://github.com/pserrer/pixi-rn",
   "navigationLinks": {
-    "GitHub": "https://github.com/pserrer/game/tree/main/packages/pixi-rn"
+    "GitHub": "https://github.com/pserrer/pixi-rn"
   }
 }
