@@ -21,7 +21,10 @@ let events: NativeEventBridge;
 // after building the scene:
 events = createNativeEventBridge(stage);
 
-function forward(type: 'down' | 'move' | 'up' | 'cancel', e: { nativeEvent: { locationX: number; locationY: number } }) {
+function forward(
+  type: 'down' | 'move' | 'up' | 'cancel',
+  e: { nativeEvent: { locationX: number; locationY: number } },
+) {
   events.dispatch({ type, x: e.nativeEvent.locationX, y: e.nativeEvent.locationY });
 }
 

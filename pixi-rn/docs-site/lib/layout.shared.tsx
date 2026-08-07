@@ -11,8 +11,12 @@ export function baseOptions(): BaseLayoutProps {
         url: '/api/',
       },
       {
+        text: 'npm',
+        url: 'https://www.npmjs.com/package/pixi-rn',
+      },
+      {
         text: 'GitHub',
-        url: 'https://github.com/pserrer/game/tree/main/packages/pixi-rn',
+        url: 'https://github.com/pserrer/pixi-rn',
       },
     ],
   };
