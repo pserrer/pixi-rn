@@ -1,0 +1,54 @@
+name: Publish to npm
+
+# Lives inside packages/pixi-rn so the subtree mirror carries it into the
+# public repo's own .github/workflows/ — it runs there, using that repo's
+# own NPM_TOKEN secret, firing right after the private repo's mirror
+# workflow pushes a version bump to this repo's main.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      # Every mirror sync pushes to main, not just version bumps — skip
+      # publishing (rather than letting `npm publish` fail loudly) when the
+      # current package.json version is already on the registry.
+      - name: Check whether this version is already published
+        id: check
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          if npm view "pixi-rn@$CURRENT_VERSION" version >/dev/null 2>&1; then
+            echo "Already published: pixi-rn@$CURRENT_VERSION"
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Not yet published: pixi-rn@$CURRENT_VERSION"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies
+        if: steps.check.outputs.should_publish == 'true'
+        run: npm install
+
+      - name: Publish
+        if: steps.check.outputs.should_publish == 'true'
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
