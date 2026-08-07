@@ -1,9 +1,13 @@
 name: Publish to npm
 
 # Lives inside packages/pixi-rn so the subtree mirror carries it into the
-# public repo's own .github/workflows/ — it runs there, using that repo's
-# own NPM_TOKEN secret, firing right after the private repo's mirror
-# workflow pushes a version bump to this repo's main.
+# public repo's own .github/workflows/ — it runs there, firing right after
+# the private repo's mirror workflow pushes a version bump to this repo's
+# main. Publishes via npm Trusted Publishing (OIDC) — no NPM_TOKEN secret,
+# no long-lived credential at all. Requires a one-time manual first publish
+# (npm has no PyPI-style "reserve before it exists" flow) and a Trusted
+# Publisher configured on the pixi-rn package's npmjs.com settings page,
+# pointing at this exact repo + workflow filename.
 on:
   push:
     branches: [main]
@@ -28,6 +32,11 @@ jobs:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
 
+      # Trusted publishing needs npm CLI 11.5.1+; Node 22's bundled npm is
+      # older than that, so upgrade it before anything else touches npm.
+      - name: Upgrade npm for trusted publishing support
+        run: npm install -g npm@latest
+
       # Every mirror sync pushes to main, not just version bumps — skip
       # publishing (rather than letting `npm publish` fail loudly) when the
       # current package.json version is already on the registry.
@@ -47,8 +56,11 @@ jobs:
         if: steps.check.outputs.should_publish == 'true'
         run: npm install
 
+      # No NODE_AUTH_TOKEN: trusted publishing exchanges this job's OIDC
+      # token (from id-token: write, above) for a short-lived npm publish
+      # credential automatically. Provenance is published automatically
+      # too, so --provenance isn't needed; --access public is a harmless
+      # no-op today but protects a future move under an npm scope.
       - name: Publish
         if: steps.check.outputs.should_publish == 'true'
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
