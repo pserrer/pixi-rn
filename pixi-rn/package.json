@@ -4,12 +4,36 @@
   "description": "pixi.js v8 inside React Native on expo-gl: renderer bring-up, retained flex layout, federated native input, texture upload, bitmap text, and a frame loop.",
   "license": "MIT",
   "private": false,
-  "main": "src/index.ts",
-  "types": "src/index.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pserrer/pixi-rn.git"
+  },
+  "homepage": "https://github.com/pserrer/pixi-rn#readme",
+  "bugs": {
+    "url": "https://github.com/pserrer/pixi-rn/issues"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json",
+    "./testing/*": "./testing/*"
+  },
   "files": [
-    "src",
+    "dist",
     "testing",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "keywords": [
     "pixi",
@@ -29,9 +53,13 @@
     "react-native": "*"
   },
   "devDependencies": {
-    "typedoc": "^0.28.0"
+    "tsdown": "^0.22.14",
+    "typedoc": "^0.28.0",
+    "typescript": "^5.8.0"
   },
   "scripts": {
+    "build": "tsdown",
+    "prepublishOnly": "npm run build",
     "docs": "typedoc"
   }
 }
