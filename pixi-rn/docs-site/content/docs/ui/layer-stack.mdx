@@ -8,8 +8,8 @@ an ORDERED set of persistent layers (a HUD, a modal screen on top of it, a
 transient toast on top of that), each rebuilt only when the data driving it
 changes, with a shared press-absorbing blocker so a tap that misses every
 control on a modal layer doesn't fall through to whatever's underneath.
-`UiLayerStack` is that primitive, extracted from a shipping game's own
-hand-rolled version of exactly this.
+`UiLayerStack` is that primitive, generalized from a hand-rolled version of
+exactly this pattern.
 
 ## Declaring the stack
 

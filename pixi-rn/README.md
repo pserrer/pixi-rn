@@ -4,9 +4,9 @@ pixi.js **v8** inside React Native, on `expo-gl` — renderer bring-up, texture
 upload, bitmap text, native touch → Pixi events, a small flex layout pass, and
 a retained UI widget kit built on top of it.
 
-Extracted from a shipping game after each of the failures below cost a device
-build to even _observe_. They are all silent: a black `GLView`, a dead process,
-or a control drawn where nothing can tap it.
+Each of the failures below cost a device build to even _observe_ before this
+existed to prevent them. They are all silent: a black `GLView`, a dead
+process, or a control drawn where nothing can tap it.
 
 ## Why this exists
 

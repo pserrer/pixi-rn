@@ -56,8 +56,8 @@ button.on('pointertap', () => console.log('tapped'));
 ```
 
 `UiButton` calls `event.stopPropagation()` on press, so a control never lets
-its tap fall through to whatever sits behind it — usually the playfield, where
-an unhandled press means something game-specific (a jump, in the game this
-package was extracted from). Any full-screen modal should sit over a
-press-absorbing blocker for the same reason; see
+its tap fall through to whatever sits behind it — usually the main scene,
+where an unhandled press means something app-specific (a jump in a
+platformer, a stroke in a drawing app). Any full-screen modal should sit over
+a press-absorbing blocker for the same reason; see
 [`UiLayerStack`](/docs/ui/layer-stack), which does this automatically.

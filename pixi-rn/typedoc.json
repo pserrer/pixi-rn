@@ -4,19 +4,15 @@
   "tsconfig": "./tsconfig.json",
   "out": "docs",
   "name": "pixi-rn",
-  "readme": "README.md",
+  "readme": "none",
   "includeVersion": true,
   "excludePrivate": true,
   "excludeInternal": true,
   "excludeExternals": true,
   "categorizeByGroup": true,
-  "navigation": {
-    "includeCategories": true,
-    "includeGroups": true
-  },
   "sort": ["source-order"],
-  "titleLink": "https://github.com/pserrer/pixi-rn",
-  "navigationLinks": {
-    "GitHub": "https://github.com/pserrer/pixi-rn"
-  }
+  "hideBreadcrumbs": true,
+  "hidePageHeader": true,
+  "hideGenerator": true,
+  "plugin": ["typedoc-plugin-markdown", "typedoc-plugin-frontmatter", "./scripts/typedoc-fumadocs.mjs"]
 }

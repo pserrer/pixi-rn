@@ -1,4 +1,4 @@
 {
   "title": "pixi-rn",
-  "pages": ["index", "getting-started", "concepts", "ui", "examples", "testing"]
+  "pages": ["index", "getting-started", "concepts", "ui", "examples", "testing", "api"]
 }
