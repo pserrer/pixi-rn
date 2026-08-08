@@ -11,6 +11,7 @@
     "serve": "npx serve out"
   },
   "dependencies": {
+    "flexsearch": "^0.8.212",
     "fumadocs-core": "^16.14.1",
     "fumadocs-mdx": "^15.2.2",
     "fumadocs-ui": "^16.14.1",

@@ -35,7 +35,7 @@ jobs:
         run: npm run docs
 
       - name: Install docs-site deps
-        run: npm install
+        run: npm ci
         working-directory: docs-site
 
       - name: Build guide site (Fumadocs + embedded API reference)

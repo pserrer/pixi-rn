@@ -16,6 +16,11 @@ const config = {
   images: { unoptimized: true },
   basePath,
   assetPrefix: basePath ? `${basePath}/` : undefined,
+  // The static search client (components/search.tsx) fetches the prebuilt
+  // index from a root-relative URL at runtime — `basePath` alone doesn't
+  // reach it there since that option only rewrites paths Next itself emits
+  // (assets, <Link>), not a hand-written fetch() call.
+  env: { NEXT_PUBLIC_BASE_PATH: basePath },
 };
 
 export default withMDX(config);
