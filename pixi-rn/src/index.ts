@@ -48,6 +48,10 @@ export {
   type NativePointerType,
 } from './input/events';
 
+// Retained-scene-graph node pooling — resize an N-node layer every frame
+// without reallocating once it reaches a steady-state size.
+export { Pool } from './perf/pool';
+
 // Generic retained UI primitives, plus a snapshot-driven layer stack built on
 // top of them. These are Expo-safe: no Graphics, Text, or canvas-backed
 // Texture.WHITE.

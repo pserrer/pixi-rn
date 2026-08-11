@@ -5,7 +5,7 @@
   "description": "Guides, examples and API reference for pixi-rn — a static site, built with Fumadocs.",
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node scripts/copy-api-docs.mjs",
+    "prebuild": "node scripts/copy-api-docs.mjs && node scripts/copy-changelog.mjs",
     "build": "next build",
     "start": "next start",
     "serve": "npx serve out"

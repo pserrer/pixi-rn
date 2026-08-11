@@ -1,0 +1,84 @@
+---
+title: Performance
+description: The recurring cost that actually shows up on this stack — steady-state allocation — and the primitives that avoid it.
+---
+
+Nearly every performance problem on this stack has the same shape: something
+that ran once now runs every frame. A GPU can usually absorb a few hundred
+sprites without complaint; a JS thread that allocates, inserts into the scene
+graph, or uploads a new texture 60 times a second cannot. The primitives below
+exist because each of them fixes one specific way that happens.
+
+## Pooling a per-frame layer
+
+```tsx
+import { Pool } from 'pixi-rn';
+import { Sprite } from 'pixi.js';
+
+const tiles = new Pool(() => new Sprite());
+stage.addChild(tiles.container);
+
+// every frame:
+tiles.fill(visibleTiles, (sprite, tile) => {
+  sprite.texture = tile.texture;
+  sprite.position.set(tile.x, tile.y);
+});
+```
+
+The common mistake is rebuilding a layer from scratch each frame —
+`container.removeChildren()` followed by a fresh `Sprite` per item. That costs
+an allocation, a scene-graph insert, and a full new vertex upload for every
+item, every frame, even for items that didn't move. `Pool` keeps a flat array
+of nodes and only ever grows it: `fill()` reuses as many pooled nodes as
+`items` needs and hides the rest (`visible = false`, not removed). Once a
+layer's item count stabilizes, a refresh allocates **nothing** — no node, no
+insert, nothing to garbage-collect.
+
+Pool doesn't cull for you — it doesn't know what "visible" means for your
+world (camera position, tile size, whatever). Filter `items` down to the
+on-screen set yourself before calling `fill()`; the pool only has to know how
+many nodes that set needs this frame.
+
+## Batching by texture identity
+
+```tsx
+import { loadSheet, makeSlicer } from 'pixi-rn';
+
+const atlas = await loadSheet('atlas', require('./assets/atlas.png'));
+const slice = makeSlicer();
+
+// module-level, not inside a render/fill loop:
+const ICON = { x: 0, y: 0, w: 16, h: 16 };
+
+sprite.texture = slice(atlas, ICON);
+```
+
+Every sprite sampling the same `TextureSource` can batch into one draw call —
+but only if it's the _same_ `Texture` object each frame, not a fresh sub-rect
+constructed on the fly. `makeSlicer()` returns a function that caches
+sub-rect `Texture`s by the **object identity** of the rect you pass it, so the
+fix is entirely about where the rect literal lives: a shared, module-level
+`{ x, y, w, h }` reused every call is a cache hit; a `{ x, y, w, h }` literal
+written inline inside a `Pool.fill()` callback is a fresh object every single
+time, which both misses the cache and leaks a `Texture` per call. See
+[Rendering](/docs/concepts/rendering) for the full picture of how sheets get
+uploaded in the first place.
+
+## Text has no native cost
+
+`BitmapText` — the only text this stack can draw — measures a string with
+plain arithmetic over advance widths, not a native call. That means a label
+can report its size to [the flex pass](/docs/concepts/layout) on every layout
+pass for free; there's no async round-trip to avoid or cache around, unlike a
+DOM/Skia text measurement would need. See [Text](/docs/concepts/text) for how
+`measureText` and `UiLabel` use this.
+
+## What this package can't see
+
+Everything above is JS-thread work: allocation, scene-graph churn, cache
+misses. None of it can tell you about GPU-side cost — overdraw, draw-call
+count, fill rate, or filter cost (a blur or a mask both run a full extra
+render pass) — because that only exists once a real GPU is rendering real
+frames. A build that looks fine in every JS-side measurement can still drop
+frames on a low-end device from overdraw alone. Profile on-device for that
+class of problem; this package's primitives only remove the JS-side tax.
