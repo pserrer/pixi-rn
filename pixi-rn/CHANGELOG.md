@@ -4,6 +4,22 @@ All notable changes to `pixi-rn` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-08-11
+
+### Added
+
+- `audio` — pooled `expo-audio` playback: `SoundPool` (a round-robin pool of
+  pre-warmed one-shot players, so a bursty retrigger never cuts off the
+  previous instance or constructs a player mid-play), `LoopSound` (a single
+  looping player toggled on/off instead of retriggered), and `warmPools`
+  (spreads pre-warming several pools' native player construction across
+  timer steps). Deliberately not built on `@pixi/sound` — that's a Web Audio
+  API library, and Hermes/React Native has no Web Audio API at all.
+- `animation` — `Tween`, a dtMs-driven 0..1 progress timer (never a ticker
+  or timer of its own), plus the `linear`/`easeInQuad`/`easeOutQuad`/
+  `easeInOutQuad`/`easeInCubic`/`easeOutCubic`/`easeInOutCubic`/`easeOutBack`
+  easing curves and a plain `lerp` it's built on.
+
 ## [0.2.0] - 2026-08-08
 
 ### Added

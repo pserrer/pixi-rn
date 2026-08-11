@@ -1,0 +1,82 @@
+---
+title: Audio
+description: Pooled, pre-warmed expo-audio players — and why this isn't built on pixi's own @pixi/sound.
+---
+
+## Why not `@pixi/sound`
+
+Pixi's own audio plugin is built entirely on the **Web Audio API**
+(`AudioContext`, `decodeAudioData`, `createBufferSource`) — none of which
+exist in Hermes/React Native, and nothing in Expo polyfills them. It's the
+same class of dead end as `@pixi/layout`'s Yoga/WASM dependency (see
+[Layout](/docs/concepts/layout)): the library assumes a browser API surface
+this platform doesn't have. `expo-audio` is the real native audio module
+here, so `pixi-rn`'s audio module wraps it instead of pixi's own.
+
+## The two real failure modes
+
+Every native audio integration on this stack eventually hits the same two
+problems, independent of what game or app it's for:
+
+- A **shared player cuts itself off** when retriggered mid-clip — two
+  overlapping coin pickups sound wrong if they fight over one `AudioPlayer`.
+- **`createAudioPlayer()` is a synchronous native constructor** that loads
+  the asset and blocks the JS thread for tens of milliseconds on Android.
+  Call it lazily on first play and that stall lands mid-gameplay, at exactly
+  the moment a sound effect fires.
+
+## `SoundPool` — one-shots
+
+```tsx
+import { SoundPool, warmPools } from 'pixi-rn';
+
+const coin = new SoundPool(require('./assets/coin.wav'), 0.85, { minGapMs: 90 });
+
+// ahead of time — a title/menu screen, never mid-run:
+const cancelWarm = warmPools([coin]);
+
+// later, on the actual trigger:
+coin.play();
+```
+
+`SoundPool` keeps a small round-robin pool of players per clip so overlapping
+triggers each get their own instance. `warmPools` constructs every pool's
+players one at a time, spread across timer steps, so the native construction
+cost lands somewhere invisible instead of stalling the first time a clip
+plays or overlaps itself. `play()` deliberately never reads `player.playing`
+to pick an idle one — every property **read** on an Expo `SharedObject`
+crosses the native bridge exactly like a method call does, so scanning for
+an idle player would cost several extra native round-trips on top of the
+`seekTo`+`play` a trigger already needs. Cycling blindly achieves the same
+thing a scan was really doing anyway.
+
+`playDeferred()` is the same call, deferred to a macrotask and throttled by
+`minGapMs` — for a trigger that fires from inside a frame-loop step (a coin
+diffed out of a simulation tick) rather than a direct touch, so the native
+bridge call can't land between that frame's simulation and its render.
+
+## `LoopSound` — a cue that repeats fast
+
+```tsx
+import { LoopSound } from 'pixi-rn';
+
+const footsteps = new LoopSound(require('./assets/footstep-loop.wav'), 0.45);
+footsteps.warmOne();
+
+// every frame, or on a state change — cheap either way:
+footsteps.setActive(isGrounded);
+```
+
+A cue that would otherwise retrigger many times a second (footsteps while
+running) is instead **one looping player**, paused and resumed rather than
+re-seeked. `setActive` early-outs unless the active state actually changed,
+so it's safe to call every frame without the caller tracking the edge
+itself.
+
+## Wiring it into a settings volume slider
+
+Neither class touches a volume slider's UI — `setVolume(mul)` on either one
+just applies a 0..1 multiplier on top of the pool's own base volume, written
+to every existing player. Call it on mount and on an actual settings change,
+never per `play()` — like `player.playing`, a `player.volume` **write** is
+also a native bridge crossing.

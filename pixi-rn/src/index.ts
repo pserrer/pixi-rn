@@ -52,6 +52,28 @@ export {
 // without reallocating once it reaches a steady-state size.
 export { Pool } from './perf/pool';
 
+// expo-audio pooling: pre-warmed player pools so a bursty one-shot never
+// constructs a player mid-play, and a looping cue is paused/resumed instead
+// of retriggered.
+export { SoundPool, LoopSound, warmPools, type SoundPoolOptions, type WarmablePool } from './audio';
+
+// A dtMs-driven progress timer plus the easing/lerp math it's built on —
+// nothing here owns a timer or ticker of its own.
+export {
+  Tween,
+  linear,
+  easeInQuad,
+  easeOutQuad,
+  easeInOutQuad,
+  easeInCubic,
+  easeOutCubic,
+  easeInOutCubic,
+  easeOutBack,
+  lerp,
+  type TweenOptions,
+  type EasingFn,
+} from './animation';
+
 // Generic retained UI primitives, plus a snapshot-driven layer stack built on
 // top of them. These are Expo-safe: no Graphics, Text, or canvas-backed
 // Texture.WHITE.

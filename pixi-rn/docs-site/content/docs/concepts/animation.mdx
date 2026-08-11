@@ -1,0 +1,70 @@
+---
+title: Animation
+description: A dtMs-driven progress timer, plus the easing and lerp math it's built on.
+---
+
+Nothing on this stack animates off a shared ticker — `pixi.js`'s
+`Ticker.shared`/`Ticker.system` are deliberately parked (see
+[Rendering](/docs/concepts/rendering)), so anything that moves over time has
+to be driven from a host's own frame loop instead. `Tween` is a small,
+unopinionated progress timer built for exactly that: advanced by an explicit
+`update(dtMs)` call, never a timer of its own.
+
+## `Tween`
+
+```tsx
+import { Tween, easeOutBack, lerp } from 'pixi-rn';
+
+const pop = new Tween({
+  duration: 280,
+  easing: easeOutBack,
+  onUpdate: (t) => sprite.scale.set(lerp(1.6, 1, t)),
+});
+
+// every frame:
+pop.update(dtMs);
+```
+
+`Tween` only drives a 0..1 progress value from 0 to `duration` — it has no
+opinion on what that progress animates. `onUpdate` receives the **eased**
+progress every call, including the final call at exactly 1; do the actual
+interpolation (a scale, an alpha, a position) there with [`lerp`](#lerp) or
+your own math. `restart()` resets progress to 0 without calling `onUpdate`
+itself — call `update(0)` right after if a caller needs the reset value
+applied on the same frame (the common case for a "pop" that restarts on a
+changing trigger, like a countdown digit).
+
+## Easing
+
+```tsx
+import {
+  linear,
+  easeInQuad,
+  easeOutQuad,
+  easeInOutQuad,
+  easeInCubic,
+  easeOutCubic,
+  easeInOutCubic,
+  easeOutBack,
+} from 'pixi-rn';
+```
+
+Standard Penner-style curves, each a plain `(t: number) => number` mapping
+0..1 to an eased 0..1 — pass one as a `Tween`'s `easing` option, or call one
+directly on your own hand-tracked progress value. `easeOutBack` overshoots
+slightly past 1 before settling, which reads as a "pop" rather than a plain
+deceleration — useful for a UI element that should feel like it lands with a
+bit of bounce.
+
+## `lerp`
+
+```tsx
+import { lerp } from 'pixi-rn';
+
+const x = lerp(startX, endX, t);
+```
+
+Plain linear interpolation between two numbers at `t`. Not clamped — a `t`
+outside 0..1 extrapolates, which is sometimes exactly what's wanted (an
+`easeOutBack`-driven value briefly overshoots past its own endpoint on
+purpose).
