@@ -52,10 +52,13 @@ export {
 // without reallocating once it reaches a steady-state size.
 export { Pool } from './perf/pool';
 
-// expo-audio pooling: pre-warmed player pools so a bursty one-shot never
-// constructs a player mid-play, and a looping cue is paused/resumed instead
-// of retriggered.
-export { SoundPool, LoopSound, warmPools, type SoundPoolOptions, type WarmablePool } from './audio';
+// NOTE: `audio` is deliberately NOT re-exported here — import it from
+// `pixi-rn/audio` instead. It is the one module that needs a native package
+// (`expo-audio`) at runtime, and a bundler resolves imports statically, so
+// re-exporting it from this barrel would force every consumer to install
+// `expo-audio` merely to bundle anything from this package at all. Keeping it
+// behind its own entry point is also what lets the offline harnesses
+// (`glsmoke`/`perf`) import this barrel with no native stubs.
 
 // dtMs-driven animation drivers plus the easing/lerp math they're built on —
 // nothing here owns a timer or ticker of its own.

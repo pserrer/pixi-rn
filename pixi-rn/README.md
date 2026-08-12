@@ -65,9 +65,11 @@ npm install pixi-rn pixi.js expo-gl expo-asset
 
 ## Package layout
 
-One folder per concern, each with a barrel `index.ts` — everything below is
-also re-exported from the package root, so `import { ... } from 'pixi-rn'`
-is all a consumer ever needs:
+One folder per concern, each with a barrel `index.ts`. Everything below is
+re-exported from the package root, so `import { ... } from 'pixi-rn'` covers
+all of it — with one deliberate exception, `audio`, which lives behind its own
+`pixi-rn/audio` entry point so that only consumers who actually want it need
+`expo-audio` installed:
 
 ```
 src/
@@ -80,6 +82,11 @@ src/
             label, padNumber, button, slider, scroll list, decoratedBox,
             plus layerStack's UiLayerStack (a generic snapshot-driven,
             multi-layer screen root) and color's outline-colour helpers
+  perf/     Pool, a retained-scene-graph node pool
+  animation/  Tween and Shake (both dtMs-driven), easing curves, lerp
+  haptics/  fail-soft vibration feedback (the host injects expo-haptics)
+  audio/    pooled expo-audio playback — NOT in the root barrel; import
+            from 'pixi-rn/audio' (needs `npx expo install expo-audio`)
 testing/    an EXGL-faithful mock GL context for offline smoke tests
 docs-site/  the guide site (getting started, concepts, examples) — its own
             Next.js + Fumadocs app; see its own README

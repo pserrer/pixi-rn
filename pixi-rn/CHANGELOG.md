@@ -4,6 +4,26 @@ All notable changes to `pixi-rn` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-08-12
+
+### Changed
+
+- **BREAKING**: `audio` moved out of the package root and behind its own
+  `pixi-rn/audio` entry point — `import { SoundPool, LoopSound, warmPools }
+from 'pixi-rn/audio'`. Nothing about the module itself changed.
+
+  It is the one module needing a native package (`expo-audio`) at runtime, and
+  a bundler resolves imports statically: while the root barrel re-exported it,
+  every consumer had to install `expo-audio` merely to bundle anything from
+  this package at all, even an app that never plays a sound. Marking the peer
+  dependency optional would not have fixed that — it only silences npm's
+  missing-peer warning, leaving a green install and a broken bundle. Removing
+  the import is what makes it genuinely optional, and it turns a missing
+  dependency into a resolution error at build time rather than a surprise.
+
+  Consumers who use audio: change the import path and keep `expo-audio`
+  installed. Consumers who don't: `expo-audio` is no longer needed at all.
+
 ## [0.4.0] - 2026-08-12
 
 ### Added
