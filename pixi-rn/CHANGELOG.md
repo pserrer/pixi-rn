@@ -4,6 +4,34 @@ All notable changes to `pixi-rn` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-08-12
+
+### Added
+
+- `Shake` (`animation`) — a decaying screen/camera shake exposed as a pair of
+  whole-pixel `x`/`y` offsets the host applies to whatever it wants shaken.
+  Like `Tween` it owns no timer or ticker: a frame loop hands it `dtMs` and
+  reads the offsets back. A decaying sine rather than random jitter (noise
+  reads as a rendering fault at a pixel-art scale), with a smaller, slower
+  vertical component so a kick reads as a jolt with a little bounce rather
+  than a circular wobble. It moves nothing itself by design — which container
+  shakes is usually the difference between an impact that looks right and one
+  that uncovers the edges of the screen.
+- `haptics` — fail-soft vibration feedback: `impactAsync`, `selectionAsync`,
+  `notificationAsync`, `isHapticsAvailable`, and `setHapticsModule`. Every call
+  no-ops (never throws) without a registered module — Expo Go, an offline
+  export, a pure OTA onto an older binary, a device with no vibrator. Each
+  takes the caller's own on/off setting as its first argument, so a settings
+  toggle takes effect without re-wiring anything. The host injects
+  `expo-haptics` itself rather than this package importing it: a bundler
+  resolves imports statically, so naming it here would force every consumer to
+  install it merely to bundle, and only the host knows when touching a native
+  module is safe.
+- `smoothstep` (`animation`) — the classic Hermite curve. Unlike the piecewise
+  `easeInOut*` curves it is one polynomial across the whole range, which is
+  what you want for ramping a continuous quantity (a speed recovering after a
+  stumble) rather than moving something from A to B.
+
 ## [0.3.0] - 2026-08-11
 
 ### Added

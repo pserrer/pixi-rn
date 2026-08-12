@@ -57,10 +57,11 @@ export { Pool } from './perf/pool';
 // of retriggered.
 export { SoundPool, LoopSound, warmPools, type SoundPoolOptions, type WarmablePool } from './audio';
 
-// A dtMs-driven progress timer plus the easing/lerp math it's built on —
+// dtMs-driven animation drivers plus the easing/lerp math they're built on —
 // nothing here owns a timer or ticker of its own.
 export {
   Tween,
+  Shake,
   linear,
   easeInQuad,
   easeOutQuad,
@@ -69,10 +70,26 @@ export {
   easeOutCubic,
   easeInOutCubic,
   easeOutBack,
+  smoothstep,
   lerp,
   type TweenOptions,
+  type ShakeOptions,
   type EasingFn,
 } from './animation';
+
+// Fail-soft haptic feedback. Nothing here imports `expo-haptics`: the host
+// injects it with `setHapticsModule`, so it stays genuinely optional (a bundler
+// resolves imports statically) and the native side is only touched where the
+// host knows it is safe to.
+export {
+  setHapticsModule,
+  impactAsync,
+  selectionAsync,
+  notificationAsync,
+  isHapticsAvailable,
+  type HapticsModule,
+  type HapticImpactStyle,
+} from './haptics';
 
 // Generic retained UI primitives, plus a snapshot-driven layer stack built on
 // top of them. These are Expo-safe: no Graphics, Text, or canvas-backed

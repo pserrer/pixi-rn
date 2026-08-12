@@ -1,14 +1,14 @@
 ---
 title: Animation
-description: A dtMs-driven progress timer, plus the easing and lerp math it's built on.
+description: dtMs-driven progress and shake drivers, plus the easing and lerp math they're built on.
 ---
 
 Nothing on this stack animates off a shared ticker — `pixi.js`'s
 `Ticker.shared`/`Ticker.system` are deliberately parked (see
 [Rendering](/docs/concepts/rendering)), so anything that moves over time has
-to be driven from a host's own frame loop instead. `Tween` is a small,
-unopinionated progress timer built for exactly that: advanced by an explicit
-`update(dtMs)` call, never a timer of its own.
+to be driven from a host's own frame loop instead. `Tween` and `Shake` are
+small, unopinionated drivers built for exactly that: advanced by an explicit
+`update(dtMs)` call, never a timer of their own.
 
 ## `Tween`
 
@@ -34,6 +34,45 @@ itself — call `update(0)` right after if a caller needs the reset value
 applied on the same frame (the common case for a "pop" that restarts on a
 changing trigger, like a countdown digit).
 
+## `Shake`
+
+```tsx
+import { Shake } from 'pixi-rn';
+
+const shake = new Shake({ amplitude: 5, duration: 260, frequency: 22 });
+
+// on impact:
+shake.kick();
+
+// every frame:
+shake.update(dtMs);
+world.x = -cameraX + shake.x;
+world.y = shake.y;
+```
+
+A decaying screen shake, expressed as a pair of whole-pixel `x`/`y` offsets
+the host applies to whatever it wants shaken. `kick()` starts one at full
+amplitude, restarting one already in flight rather than stacking with it — a
+second impact should hit as hard as the first, not twice as hard. `clear()`
+drops it, which is what you want whenever the world is replaced wholesale (a
+new level, a restart) so a kick from the old one cannot bleed into the new.
+
+It is a decaying **sine**, not random jitter. Noise reads as a rendering
+fault — especially at a pixel-art scale, where a stray offset looks like a
+torn sprite — while a couple of clean oscillations read as an impact. The
+vertical component is smaller and slower than the horizontal one
+(`verticalRatio`, default `0.5`), so a kick reads as a jolt with a little
+bounce rather than a circular wobble. Offsets are rounded to whole pixels, so
+a nearest-neighbour scene never lands off-grid mid-shake.
+
+<Callout type="warn">
+  Whatever you offset stops covering the screen edges. Shaking a root container by N pixels uncovers up to N pixels of
+  whatever sits behind it — usually the framebuffer clear, which is a solid colour and reads as a bright strip along one
+  edge. Either shake only the layers that have something opaque behind them, or make sure the reveal lands somewhere it
+  cannot be seen. `Shake` deliberately moves nothing itself, because that choice is usually the difference between an
+  impact that looks right and one that tears the screen open.
+</Callout>
+
 ## Easing
 
 ```tsx
@@ -46,6 +85,7 @@ import {
   easeOutCubic,
   easeInOutCubic,
   easeOutBack,
+  smoothstep,
 } from 'pixi-rn';
 ```
 
@@ -55,6 +95,12 @@ directly on your own hand-tracked progress value. `easeOutBack` overshoots
 slightly past 1 before settling, which reads as a "pop" rather than a plain
 deceleration — useful for a UI element that should feel like it lands with a
 bit of bounce.
+
+`smoothstep` is the classic Hermite curve (`t²(3−2t)`). Unlike the piecewise
+`easeInOut*` curves it is a single polynomial across the whole range, which
+makes it the natural pick for ramping a **continuous** quantity — a speed
+recovering after a stumble, a volume fading in — rather than moving something
+from A to B, where a piecewise ease is fine.
 
 ## `lerp`
 

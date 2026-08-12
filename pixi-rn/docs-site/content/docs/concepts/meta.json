@@ -1,4 +1,4 @@
 {
   "title": "Concepts",
-  "pages": ["rendering", "layout", "text", "input", "audio", "animation", "performance"]
+  "pages": ["rendering", "layout", "text", "input", "audio", "animation", "haptics", "performance"]
 }
