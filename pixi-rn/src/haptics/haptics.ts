@@ -1,38 +1,51 @@
-import { Platform } from 'react-native';
+import { Platform, Vibration } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 /**
- * Fail-soft haptic feedback, wrapping `expo-haptics`.
+ * Fail-soft haptic feedback.
  *
  * Haptics are an enhancement, never a dependency: a device with no vibrator, a
- * simulator, or a user who has turned system haptics off must all behave as if
- * the calls simply did nothing. So every function here swallows its own
- * failures — no call site needs a `try`/`catch`, and none of them returns a
- * promise you have to handle.
+ * simulator, or a user who has turned them off must all behave as if the calls
+ * simply did nothing. Every function here swallows its own failures — no call
+ * site needs a `try`/`catch`, and none returns a promise you must handle.
  *
- * ⚠️ **On Android these route through the device's HAPTIC ENGINE, not the raw
- * `Vibrator`.** `expo-haptics`' cross-platform cues (`impactAsync`,
- * `notificationAsync`, `selectionAsync`) are implemented on Android as
- * hand-rolled `Vibrator` waveforms, and they are *quiet*: the strongest of them,
- * `impactAsync('heavy')`, is a single 60ms pulse at amplitude 70 out of 255 —
- * about 27%. Mid-game, against a sound effect and a screen shake, that is easy
- * to miss entirely. `expo-haptics`' own documentation says so outright: "Android's
- * `Vibrator` API is not recommended for implementing haptics feedback. Instead,
- * you should use `performAndroidHapticsAsync`", which calls
- * `View.performHapticFeedback` and gets the platform's real, tuned effects — the
- * ones system UI itself uses. This module does that automatically, so callers
- * keep using one cross-platform API and still get the good haptics on Android.
+ * ## Android drives the vibrator directly
  *
- * The trade is worth knowing: the engine path RESPECTS the system "touch
- * feedback" setting, where the raw `Vibrator` path ignores it. A user who has
- * turned haptics off system-wide will now correctly feel nothing.
+ * There are three ways to make an Android phone buzz, and for GAME feedback
+ * only one of them is dependable:
+ *
+ * 1. `expo-haptics`' cross-platform cues → hand-rolled `Vibrator` waveforms,
+ *    capped at amplitude 70 of 255 (~27%) for the strongest of them. Quiet
+ *    enough to miss entirely mid-game.
+ * 2. `performAndroidHapticsAsync` → `View.performHapticFeedback`, the
+ *    platform's own tuned effects. Feels best — and is **silently suppressed**
+ *    when the system's *haptic feedback* level is 0. `performHapticFeedback`
+ *    returns a boolean saying whether it did anything, `expo-haptics` discards
+ *    it, so the call resolves successfully having done nothing at all. This
+ *    cost five rounds of debugging against a real device before the setting was
+ *    found; nothing observable from inside the app distinguishes it from a
+ *    device with no vibrator.
+ * 3. `Vibration.vibrate` (React Native core) → the vibrator at FULL amplitude
+ *    for a given duration, governed by neither the touch-feedback level nor the
+ *    keyboard one.
+ *
+ * This module uses (3) on Android and `expo-haptics` on iOS, where the impact
+ * generators are the right thing and have no equivalent trapdoor.
+ *
+ * ⚠️ **This deliberately bypasses the system's touch-feedback level.** That
+ * setting governs UI touch feedback — keyboard taps, button presses — and a
+ * game's collision cue is not that; Android itself separates the two (its
+ * settings screen has an independent "media vibration" level). The user's
+ * control over game haptics is the HOST APP's own toggle, which every function
+ * here takes as its first argument and which must be honoured. If your app has
+ * no such toggle, add one before using this.
  *
  * @example
  * ```ts
  * import { impactAsync } from 'pixi-rn/haptics';
  *
- * // `enabled` is the user's own setting — pass it through on every call
- * // rather than caching it, so a settings toggle takes effect immediately.
+ * // `enabled` is the user's own setting — pass it through on every call rather
+ * // than caching it, so a settings toggle takes effect immediately.
  * impactAsync(settings.vibration, 'heavy');
  * ```
  */
@@ -54,42 +67,37 @@ const NOTIFICATION_TYPES = {
   error: Haptics.NotificationFeedbackType.Error,
 };
 
-// `performAndroidHapticsAsync` is newer than the three cross-platform cues, so
-// it is feature-detected rather than assumed — an older `expo-haptics` simply
-// keeps the Vibrator path.
-const useEngine = Platform.OS === 'android' && typeof Haptics.performAndroidHapticsAsync === 'function';
+const ANDROID = Platform.OS === 'android';
 
-// The engine's effects are SEMANTIC ("confirm", "reject"), not intensities, so
-// the mapping is by meaning rather than by strength. `Reject` — "the rejection
-// or failure of a user interaction" — is what a collision actually is, and is
-// also the most emphatic effect available.
-const ANDROID_IMPACT: Record<HapticImpactStyle, Haptics.AndroidHaptics> = {
-  light: Haptics.AndroidHaptics?.Segment_Tick,
-  soft: Haptics.AndroidHaptics?.Clock_Tick,
-  medium: Haptics.AndroidHaptics?.Context_Click,
-  rigid: Haptics.AndroidHaptics?.Virtual_Key,
-  heavy: Haptics.AndroidHaptics?.Reject,
+// Durations in ms. `Vibration.vibrate(ms)` runs the motor at full amplitude for
+// that long, so these are shorter than the equivalent expo-haptics waveforms —
+// those pad their length to compensate for running at a quarter power.
+const ANDROID_IMPACT_MS: Record<HapticImpactStyle, number> = {
+  light: 12,
+  soft: 12,
+  medium: 22,
+  rigid: 22,
+  heavy: 45,
 };
 
-const ANDROID_NOTIFICATION = {
-  success: Haptics.AndroidHaptics?.Confirm,
-  warning: Haptics.AndroidHaptics?.Reject,
-  error: Haptics.AndroidHaptics?.Reject,
+// [wait, buzz, wait, buzz, …] — a rhythm reads as a distinct event where a
+// single pulse of the same total length reads as a stray buzz.
+const ANDROID_NOTIFICATION_MS = {
+  success: [0, 25, 90, 25],
+  warning: [0, 35, 90, 55],
+  error: [0, 45, 80, 35, 80, 55],
 };
 
 /** What the module knows about its own state — see {@link hapticsDiagnostics}. */
 export interface HapticsDiagnostics {
   /** `Platform.OS`. */
   platform: string;
-  /** True when the Android haptic-engine path is in use rather than the raw
-   *  `Vibrator` waveforms. Always false off Android. */
-  engine: boolean;
-  /** Cues requested since launch. A cue that was requested but not felt is the
-   *  interesting case: it proves the call path works and moves the question to
-   *  the device. */
+  /** Which implementation is in use: the Android vibrator, or `expo-haptics`. */
+  path: 'vibrator' | 'expo-haptics';
+  /** Cues requested since launch. */
   calls: number;
-  /** The last failure from a cue, if any. `null` means every call so far was
-   *  accepted by the native side. */
+  /** The last failure from a cue, if any. ⚠️ `null` does NOT prove the device
+   *  buzzed — no platform reports that back. It only means nothing threw. */
   lastError: string | null;
 }
 
@@ -99,25 +107,22 @@ let lastError: string | null = null;
 /**
  * Report what this module knows about itself. Nothing here can tell you whether
  * the user FELT anything — no platform exposes that — but it does separate "the
- * app never asked" from "the app asked and the device declined" from "the app
- * asked, the device accepted, and it was still imperceptible", which is
- * otherwise indistinguishable from the outside.
+ * app never asked" from "the app asked and something threw".
  */
 export function hapticsDiagnostics(): HapticsDiagnostics {
-  return { platform: String(Platform.OS), engine: useEngine, calls, lastError };
+  return { platform: String(Platform.OS), path: ANDROID ? 'vibrator' : 'expo-haptics', calls, lastError };
 }
 
 // Fire-and-forget. These are typically called from a frame loop's event
 // handling, where awaiting a native round-trip would sit between the simulation
-// step and the render; and a rejection (no vibrator, permission withheld) must
-// never surface as an unhandled promise rejection — it is recorded for
+// step and the render; and a failure (no vibrator, permission withheld) must
+// never surface as an unhandled rejection — it is recorded for
 // `hapticsDiagnostics` instead of thrown.
-function fire(run: () => Promise<void>): void {
+function fire(run: () => Promise<void> | void): void {
   calls++;
   try {
-    void run().catch((err: unknown) => {
-      lastError = err instanceof Error ? err.message : String(err);
-    });
+    const result = run();
+    if (result) void result.catch((err: unknown) => void (lastError = String(err)));
   } catch (err) {
     lastError = err instanceof Error ? err.message : String(err);
   }
@@ -130,7 +135,7 @@ function fire(run: () => Promise<void>): void {
  */
 export function impactAsync(enabled: boolean, style: HapticImpactStyle = 'medium'): void {
   if (!enabled) return;
-  if (useEngine) fire(() => Haptics.performAndroidHapticsAsync(ANDROID_IMPACT[style]));
+  if (ANDROID) fire(() => Vibration.vibrate(ANDROID_IMPACT_MS[style]));
   else fire(() => Haptics.impactAsync(IMPACT_STYLES[style]));
 }
 
@@ -138,13 +143,13 @@ export function impactAsync(enabled: boolean, style: HapticImpactStyle = 'medium
  *  slider passing a detent). */
 export function selectionAsync(enabled: boolean): void {
   if (!enabled) return;
-  if (useEngine) fire(() => Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Segment_Tick));
+  if (ANDROID) fire(() => Vibration.vibrate(10));
   else fire(() => Haptics.selectionAsync());
 }
 
 /** An outcome cue — a purchase clearing, an action being rejected. */
 export function notificationAsync(enabled: boolean, type: 'success' | 'warning' | 'error' = 'success'): void {
   if (!enabled) return;
-  if (useEngine) fire(() => Haptics.performAndroidHapticsAsync(ANDROID_NOTIFICATION[type]));
+  if (ANDROID) fire(() => Vibration.vibrate(ANDROID_NOTIFICATION_MS[type]));
   else fire(() => Haptics.notificationAsync(NOTIFICATION_TYPES[type]));
 }

@@ -41,38 +41,34 @@ event handling, where awaiting a native round-trip would sit between the
 simulation step and the render; and a rejection (no vibrator, permission
 withheld) must never surface as an unhandled promise rejection.
 
-## Android uses the haptic engine
+## Android drives the vibrator directly
 
-`expo-haptics`' three cross-platform cues are implemented on Android as
-hand-rolled `Vibrator` waveforms, and they are **quiet**. The strongest of them,
-`impactAsync('heavy')`, is a single 60ms pulse at amplitude 70 out of 255 —
-about 27%. In a game, against a sound effect and a screen shake, that is easy to
-miss entirely.
+There are three ways to make an Android phone buzz, and for **game** feedback
+only one of them is dependable:
 
-`expo-haptics`' own documentation says as much: _"Android's `Vibrator` API is
-not recommended for implementing haptics feedback. Instead, you should use
-`performAndroidHapticsAsync`."_ That calls `View.performHapticFeedback` and gets
-the platform's real, tuned effects — the ones system UI itself uses.
+| approach                                                   | amplitude          | suppressed by                        |
+| ---------------------------------------------------------- | ------------------ | ------------------------------------ |
+| `expo-haptics`' cross-platform cues (`Vibrator` waveforms) | ≤ 70/255 (~27%)    | —                                    |
+| `performAndroidHapticsAsync` (the haptic engine)           | the platform's own | **the system haptic-feedback level** |
+| `Vibration.vibrate` (React Native core)                    | full               | —                                    |
 
-This module does that for you. The API above is unchanged; on Android each cue
-is mapped onto the engine's semantic effects instead:
+The engine feels best, and it is what this module used in `0.8.0`. It has a
+trapdoor: when the system's haptic-feedback level is **0**, it does nothing —
+and says nothing. `View.performHapticFeedback` returns a boolean reporting
+whether it performed, `expo-haptics` discards that boolean, so the call resolves
+successfully having produced no vibration at all. Nothing observable from inside
+the app distinguishes that from a device with no vibrator.
 
-| cue                               | Android engine effect |
-| --------------------------------- | --------------------- |
-| `impactAsync(…, 'heavy')`         | `Reject`              |
-| `impactAsync(…, 'medium')`        | `Context_Click`       |
-| `selectionAsync`                  | `Segment_Tick`        |
-| `notificationAsync(…, 'success')` | `Confirm`             |
+So on Android this module now calls `Vibration.vibrate` with per-cue durations.
+It runs the motor at full amplitude and is governed by neither the
+touch-feedback level nor the keyboard one. iOS keeps `expo-haptics`, where the
+impact generators are the right thing and have no equivalent trapdoor.
 
-The effects are semantic rather than intensities, so the mapping is by meaning —
-`Reject` is "the rejection or failure of a user interaction", which is exactly
-what a collision is. It's feature-detected, so an older `expo-haptics` keeps the
-`Vibrator` path, and iOS is untouched.
-
-<Callout type="warn" title="One behavioural trade">
-  The engine path **respects the system "touch feedback" setting**, where the raw `Vibrator` path ignores it. A user who
-  has turned haptics off system-wide will now correctly feel nothing — which is the right behaviour, but worth knowing
-  when a device seems silent.
+<Callout type="warn" title="This bypasses a system setting on purpose">
+  The touch-feedback level governs **UI** feedback — keyboard taps, button presses — and a game's collision cue is not
+  that. Android itself separates the two: its settings screen carries an independent "media vibration" level. The user's
+  control over game haptics is therefore **your app's own toggle**, which every function here takes as its first
+  argument. If your app doesn't have one, add it before using this module.
 </Callout>
 
 ## Installation

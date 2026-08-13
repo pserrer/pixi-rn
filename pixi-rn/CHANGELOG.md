@@ -4,6 +4,35 @@ All notable changes to `pixi-rn` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/).
 
+## [0.10.0] - 2026-08-13
+
+### Changed
+
+- On Android, `haptics` now drives the vibrator directly through React Native's
+  `Vibration` API instead of `performAndroidHapticsAsync`. iOS is unchanged.
+
+  The haptic engine feels better, but it is **silently suppressed when the
+  system's haptic-feedback level is 0** — and nothing observable from inside the
+  app says so. `View.performHapticFeedback` returns a boolean reporting whether
+  it did anything and `expo-haptics` discards it, so the call resolves
+  successfully having done nothing. That cost five rounds of debugging against a
+  real device: the app was asking, the native side was accepting, and the phone
+  was silent because of a slider in the OS sound settings.
+
+  `Vibration.vibrate` is governed by neither the touch-feedback level nor the
+  keyboard one, and runs the motor at FULL amplitude — where `expo-haptics`'
+  Android waveforms cap at ~27%. So it is both more dependable and stronger.
+
+  ⚠️ This deliberately bypasses the system's touch-feedback level. That setting
+  governs UI touch feedback, and a game's collision cue is not that — Android
+  itself separates the two, with an independent "media vibration" level. The
+  user's control over game haptics is the host app's own toggle, which every
+  function takes as its first argument. Do not use this module without one.
+
+- `hapticsDiagnostics()` reports `path` (`'vibrator'` | `'expo-haptics'`) in
+  place of the `engine` boolean, and its `lastError` doc now says plainly that
+  `null` does not prove the device buzzed — only that nothing threw.
+
 ## [0.9.0] - 2026-08-13
 
 ### Added
