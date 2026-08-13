@@ -1,6 +1,6 @@
 {
   "name": "pixi-rn",
-  "version": "0.5.0",
+  "version": "0.7.0",
   "description": "pixi.js v8 inside React Native on expo-gl: renderer bring-up, retained flex layout, federated native input, texture upload, bitmap text, a frame loop, expo-audio pooling, and a dtMs-driven tween.",
   "license": "MIT",
   "private": false,
@@ -36,6 +36,16 @@
         "default": "./dist/audio.cjs"
       }
     },
+    "./haptics": {
+      "import": {
+        "types": "./dist/haptics.d.mts",
+        "default": "./dist/haptics.mjs"
+      },
+      "require": {
+        "types": "./dist/haptics.d.cts",
+        "default": "./dist/haptics.cjs"
+      }
+    },
     "./package.json": "./package.json",
     "./testing/*": "./testing/*"
   },
@@ -60,6 +70,7 @@
     "expo-asset": "*",
     "expo-audio": "*",
     "expo-gl": "*",
+    "expo-haptics": "*",
     "pixi.js": "^8.0.0",
     "react": "*",
     "react-native": "*"

@@ -1,89 +1,52 @@
 ---
 title: Haptics
-description: Fail-soft vibration feedback, with the native module injected by the host.
+description: Fail-soft vibration feedback, behind its own entry point.
 ---
 
-Haptics are an enhancement, never a dependency: an app has to behave
-identically on a build that cannot vibrate at all. That is not a rare case —
-Expo Go, an offline `expo export` in CI, a pure OTA onto a binary that predates
-the dependency, a simulator, and a device with no vibrator all hit it. So every
-function here is a **no-op, never a throw**, and none of your call sites needs a
-`try`/`catch` of its own.
-
-## Register the module once
-
-This package does not import `expo-haptics`. The host hands it in:
+Haptics are an enhancement, never a dependency. A device with no vibrator, a
+simulator, or a user who has turned system haptics off must all behave as if the
+calls simply did nothing — so every function here swallows its own failures. No
+call site needs a `try`/`catch`, and none of them returns a promise you have to
+handle.
 
 ```tsx
-import { setHapticsModule } from 'pixi-rn';
+import { impactAsync } from 'pixi-rn/haptics';
 
-useEffect(() => {
-  try {
-    setHapticsModule(require('expo-haptics'));
-  } catch {
-    setHapticsModule(null); // no native side — every call below no-ops
-  }
-}, []);
+// `enabled` is the user's own setting — pass it through on every call rather
+// than caching it, so a settings toggle takes effect immediately.
+impactAsync(settings.vibration, 'heavy');
 ```
-
-<Callout type="warn" title="Inside an effect, never at module scope">
-  `expo-haptics` resolves its native module the moment it evaluates, and a synchronous native touch during module
-  evaluation can take an app down before any error boundary exists — a `try`/`catch` around the *import* does not
-  protect against it. Register from an effect, or from anywhere else you already know it is safe to touch the native
-  side.
-</Callout>
 
 ## The three cues
 
 ```tsx
-import { impactAsync, selectionAsync, notificationAsync } from 'pixi-rn';
+import { impactAsync, selectionAsync, notificationAsync } from 'pixi-rn/haptics';
 
 impactAsync(enabled, 'medium'); // a collision, a landing, a snap into place
 selectionAsync(enabled); // a picker stepping, a slider passing a detent
 notificationAsync(enabled, 'success'); // a purchase clearing, an action rejected
 ```
 
-The first argument is the **user's own on/off setting**, passed through on every
-call rather than configured once — so a settings toggle takes effect
-immediately, with nothing to re-wire.
+The first argument is always the **user's own on/off setting**. Passing it per
+call rather than configuring it once is deliberate: a settings toggle then takes
+effect immediately, with nothing to re-wire and no stale copy to invalidate.
 
 `impactAsync` takes `'light' | 'medium' | 'heavy' | 'rigid' | 'soft'` (default
 `'medium'`), mapped onto `expo-haptics`' own `ImpactFeedbackStyle`.
 `notificationAsync` takes `'success' | 'warning' | 'error'` (default
 `'success'`).
 
-All three are **fire-and-forget**. They are typically called from a frame
-loop's event handling, where awaiting a native round-trip would sit between the
+All three are **fire-and-forget**. They are typically called from a frame loop's
+event handling, where awaiting a native round-trip would sit between the
 simulation step and the render; and a rejection (no vibrator, permission
-withheld, the native side missing from an older binary) must never surface as an
-unhandled promise rejection.
-
-`isHapticsAvailable()` reports whether a module has been registered.
-Diagnostics only — the feedback functions already no-op without one.
-
-## Why injection
-
-It would be simpler to `import 'expo-haptics'` here and wrap it in a
-`try`/`catch`. That does not work, for two independent reasons:
-
-- **A bundler resolves imports statically.** Metro walks every `import` and
-  `require` in the graph at build time, so a package that named `expo-haptics`
-  directly would force every consumer to install it just to bundle — no matter
-  how carefully the call itself were guarded. Injection keeps it genuinely
-  optional. (Bundling this package with a `require` is worse still: rolldown
-  rewrites it into `node:module`'s `createRequire` for the ESM output, which
-  Metro then cannot resolve at all.)
-- **The host knows when a native touch is safe**; a library does not.
-
-The tradeoff is one setup call, which also makes the module trivial to stub:
-`setHapticsModule` accepts anything structurally matching `HapticsModule`, and
-every member of it is optional, so a partial test double is valid and a missing
-member simply makes that cue a no-op.
+withheld) must never surface as an unhandled promise rejection.
 
 ## Installation
 
-`expo-haptics` is optional and belongs to the **host app**, not to this
-package — install it only if you want haptics:
+Haptics live behind their own entry point, `pixi-rn/haptics` — the same rule
+[`audio`](/docs/concepts/audio) follows, so a native capability never rides
+along in the root barrel for consumers who don't use it. Install `expo-haptics`
+alongside it:
 
 ```sh
 npx expo install expo-haptics
@@ -91,3 +54,11 @@ npx expo install expo-haptics
 
 It is a native module, so adding it needs a fresh native build; an OTA update
 onto a binary without it will not gain haptics.
+
+<Callout title="Why there is no setup call">
+  Earlier versions had the host inject `expo-haptics` with a `setHapticsModule` call, so that naming the package here
+  couldn't force it on every consumer — a bundler resolves imports statically, so an import in the root barrel is an
+  import for everybody. Moving the module behind its own entry point solves that directly and better: the dependency now
+  follows the feature. Injection was left buying only stubbability, while charging a real price — a host that forgot the
+  registration call got silence, with nothing failing to say so. A plain import has no step to forget.
+</Callout>

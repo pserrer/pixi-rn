@@ -33,15 +33,6 @@ rmSync(DEST, { recursive: true, force: true });
 mkdirSync(path.dirname(DEST), { recursive: true });
 cpSync(PIXI_RN_DOCS, DEST, { recursive: true });
 
-// typedoc-plugin-markdown's entry page is README.md; Fumadocs wants an
-// index page for a folder's own landing route.
-const readme = path.join(DEST, 'README.md');
-if (existsSync(readme)) {
-  const index = path.join(DEST, 'index.md');
-  writeFileSync(index, readFileSync(readme, 'utf8'));
-  rmSync(readme);
-}
-
 function walk(dir) {
   const out = [];
   for (const entry of readdirSync(dir)) {
@@ -52,6 +43,23 @@ function walk(dir) {
   return out;
 }
 
+// typedoc-plugin-markdown's entry page for any folder is README.md; Fumadocs
+// wants an index page instead, so a folder's own landing ROUTE resolves. With
+// one entry point per package subpath there is one of these per module, not
+// just at the top — so this walks, rather than special-casing the root.
+function readmesToIndexes(dir) {
+  const readme = path.join(dir, 'README.md');
+  if (existsSync(readme)) {
+    writeFileSync(path.join(dir, 'index.md'), readFileSync(readme, 'utf8'));
+    rmSync(readme);
+  }
+  for (const entry of readdirSync(dir)) {
+    const full = path.join(dir, entry);
+    if (statSync(full).isDirectory()) readmesToIndexes(full);
+  }
+}
+readmesToIndexes(DEST);
+
 const files = walk(DEST);
 for (const file of files) {
   const dir = path.dirname(file);
@@ -59,8 +67,14 @@ for (const file of files) {
     /\]\(([^)\s]+?\.md)(#[^)]*)?\)/g,
     (_match, relPath, anchor = '') => {
       const targetAbs = path.resolve(dir, relPath);
-      const targetRoute = path.relative(DEST, targetAbs).replace(/\.md$/, '').replace(/\\/g, '/');
-      return `](${BASE_ROUTE}/${targetRoute}${anchor})`;
+      const targetRoute = path
+        .relative(DEST, targetAbs)
+        .replace(/\.md$/, '')
+        .replace(/\\/g, '/')
+        // A folder's landing page is served at the FOLDER's route; linking to
+        // `…/index` (or the README it was renamed from) 404s.
+        .replace(/(^|\/)(index|README)$/, '');
+      return `](${BASE_ROUTE}${targetRoute ? `/${targetRoute}` : ''}${anchor})`;
     },
   );
   writeFileSync(file, content);
@@ -68,10 +82,25 @@ for (const file of files) {
 
 writeFileSync(path.join(DEST, 'meta.json'), JSON.stringify({ title: 'API Reference' }, null, 2) + '\n');
 const titleCase = (s) => s.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+// The top-level folders are one per ENTRY POINT, and TypeDoc names them after
+// the source path (`src/index.ts` → `index`). Title them by the import path a
+// reader would actually write instead — that, not the file layout, is what
+// tells them where a symbol comes from.
+const MODULE_TITLES = { index: 'pixi-rn', audio: 'pixi-rn/audio', haptics: 'pixi-rn/haptics' };
 for (const entry of readdirSync(DEST)) {
   const full = path.join(DEST, entry);
-  if (statSync(full).isDirectory()) {
-    writeFileSync(path.join(full, 'meta.json'), JSON.stringify({ title: titleCase(entry) }, null, 2) + '\n');
+  if (!statSync(full).isDirectory()) continue;
+  writeFileSync(
+    path.join(full, 'meta.json'),
+    JSON.stringify({ title: MODULE_TITLES[entry] ?? titleCase(entry) }, null, 2) + '\n',
+  );
+  // The kind folders NESTED inside a module (classes/, functions/, …) need
+  // their own titles too, now that they are one level deeper than they used
+  // to be.
+  for (const sub of readdirSync(full)) {
+    const subFull = path.join(full, sub);
+    if (!statSync(subFull).isDirectory()) continue;
+    writeFileSync(path.join(subFull, 'meta.json'), JSON.stringify({ title: titleCase(sub) }, null, 2) + '\n');
   }
 }
 

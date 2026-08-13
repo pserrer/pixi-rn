@@ -6,7 +6,8 @@ export default function HomePage() {
       <h1 className="text-4xl font-bold tracking-tight">pixi-rn</h1>
       <p className="max-w-xl text-fd-muted-foreground">
         pixi.js v8 inside React Native, on expo-gl — renderer bring-up, a small flex layout pass, native touch → Pixi
-        events, and a retained UI widget kit built on top of it.
+        events, a retained UI widget kit, scene-graph pooling, dtMs-driven animation, and pooled audio and haptics
+        behind their own entry points.
       </p>
       <div className="flex gap-4">
         <Link
@@ -15,7 +16,10 @@ export default function HomePage() {
         >
           Read the docs
         </Link>
-        <Link href="/api/" className="rounded-md border border-fd-border px-5 py-2.5 font-medium hover:bg-fd-accent">
+        <Link
+          href="/docs/api"
+          className="rounded-md border border-fd-border px-5 py-2.5 font-medium hover:bg-fd-accent"
+        >
           API reference
         </Link>
       </div>

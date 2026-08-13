@@ -4,6 +4,50 @@ All notable changes to `pixi-rn` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] - 2026-08-13
+
+### Changed
+
+- **BREAKING**: `haptics` now imports `expo-haptics` directly, and
+  `setHapticsModule` is gone — with it `isHapticsAvailable` and the
+  `HapticsModule` type. Hosts should delete their registration call; the three
+  cues (`impactAsync`, `selectionAsync`, `notificationAsync`) are unchanged.
+  `expo-haptics` becomes a peer dependency, required only for consumers who
+  import `pixi-rn/haptics`.
+
+  Injection existed to keep `expo-haptics` from being forced on every consumer,
+  because a bundler resolves imports statically. Moving the module behind its
+  own entry point in 0.6.0 solved that directly, leaving injection to buy only
+  stubbability — while charging a real price: a host that forgets the
+  registration call gets silence, with nothing failing to say so. The module is
+  now structurally identical to `pixi-rn/audio`: the dependency follows the
+  feature, and there is no setup step to forget.
+
+### Fixed
+
+- The API reference covers `pixi-rn/audio` and `pixi-rn/haptics` again. TypeDoc
+  had a single entry point (`src/index.ts`), so both silently vanished from the
+  generated docs when they moved out of the root barrel in 0.5.0 and 0.6.0.
+  Each entry point is now its own documented module, titled by the import path
+  it corresponds to.
+
+## [0.6.0] - 2026-08-12
+
+### Changed
+
+- **BREAKING**: `haptics` moved out of the package root and behind its own
+  `pixi-rn/haptics` entry point — `import { setHapticsModule, impactAsync }
+from 'pixi-rn/haptics'`. Nothing about the module itself changed.
+
+  This completes a single rule: **a module that touches a native capability
+  lives behind its own subpath**, so a consumer only takes on a native
+  dependency for a feature they actually use. For `audio` (0.5.0) that was
+  load-bearing — it imports `expo-audio` at module scope, and a bundler
+  resolves imports statically. `haptics` reaches its native module only
+  through an injected implementation, so it could have stayed in the root
+  barrel; it doesn't, because one rule a consumer can remember is worth more
+  than the one import it saves.
+
 ## [0.5.0] - 2026-08-12
 
 ### Changed

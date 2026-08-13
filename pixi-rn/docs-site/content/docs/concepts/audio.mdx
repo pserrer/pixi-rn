@@ -14,11 +14,11 @@ this platform doesn't have. `expo-audio` is the real native audio module
 here, so `pixi-rn`'s audio module wraps it instead of pixi's own.
 
 <Callout title="Its own entry point, on purpose">
-  Audio is the one module that is **not** re-exported from the package root — import it from `pixi-rn/audio`, and
-  install `expo-audio` alongside it (`npx expo install expo-audio`). A bundler resolves imports statically, so a root
-  barrel that reached `expo-audio` would force every consumer to install the native package merely to bundle anything at
-  all, even an app that never plays a sound. Keeping audio behind its own entry point is what makes that dependency
-  follow the feature.
+  Every module that touches a native capability lives behind its own entry point rather than the package root — audio
+  here, and [haptics](/docs/concepts/haptics) likewise. Import it from `pixi-rn/audio`, and install `expo-audio`
+  alongside it (`npx expo install expo-audio`). A bundler resolves imports statically, so a root barrel that reached
+  `expo-audio` would force every consumer to install the native package merely to bundle anything at all, even an app
+  that never plays a sound. Keeping it behind its own entry point is what makes the dependency follow the feature.
 </Callout>
 
 ## The two real failure modes

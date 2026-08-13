@@ -52,13 +52,19 @@ export {
 // without reallocating once it reaches a steady-state size.
 export { Pool } from './perf/pool';
 
-// NOTE: `audio` is deliberately NOT re-exported here — import it from
-// `pixi-rn/audio` instead. It is the one module that needs a native package
-// (`expo-audio`) at runtime, and a bundler resolves imports statically, so
-// re-exporting it from this barrel would force every consumer to install
-// `expo-audio` merely to bundle anything from this package at all. Keeping it
-// behind its own entry point is also what lets the offline harnesses
-// (`glsmoke`/`perf`) import this barrel with no native stubs.
+// NOTE: the NATIVE-CAPABILITY modules are deliberately NOT re-exported here.
+// `audio` and `haptics` each live behind their own entry point — import them
+// from `pixi-rn/audio` and `pixi-rn/haptics` — so a consumer only takes on a
+// native dependency for a feature they actually use.
+//
+// For `audio` this is load-bearing: it imports `expo-audio` at module scope,
+// and a bundler resolves imports statically, so re-exporting it here would
+// force every consumer to install that package merely to bundle anything at
+// all. It is also what lets the offline harnesses (`glsmoke`/`perf`) import
+// this barrel with no native stubs. `haptics` reaches its native module only
+// through an injected implementation, so it could technically sit here — it
+// doesn't, because one rule ("a native capability lives behind a subpath") is
+// worth more than the one import it would save.
 
 // dtMs-driven animation drivers plus the easing/lerp math they're built on —
 // nothing here owns a timer or ticker of its own.
@@ -79,20 +85,6 @@ export {
   type ShakeOptions,
   type EasingFn,
 } from './animation';
-
-// Fail-soft haptic feedback. Nothing here imports `expo-haptics`: the host
-// injects it with `setHapticsModule`, so it stays genuinely optional (a bundler
-// resolves imports statically) and the native side is only touched where the
-// host knows it is safe to.
-export {
-  setHapticsModule,
-  impactAsync,
-  selectionAsync,
-  notificationAsync,
-  isHapticsAvailable,
-  type HapticsModule,
-  type HapticImpactStyle,
-} from './haptics';
 
 // Generic retained UI primitives, plus a snapshot-driven layer stack built on
 // top of them. These are Expo-safe: no Graphics, Text, or canvas-backed

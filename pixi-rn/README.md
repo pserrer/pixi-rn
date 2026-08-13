@@ -67,9 +67,9 @@ npm install pixi-rn pixi.js expo-gl expo-asset
 
 One folder per concern, each with a barrel `index.ts`. Everything below is
 re-exported from the package root, so `import { ... } from 'pixi-rn'` covers
-all of it — with one deliberate exception, `audio`, which lives behind its own
-`pixi-rn/audio` entry point so that only consumers who actually want it need
-`expo-audio` installed:
+all of it — except the modules that touch a NATIVE capability. Those live
+behind their own entry points (`pixi-rn/audio`, `pixi-rn/haptics`), so a
+consumer only takes on a native dependency for a feature they actually use:
 
 ```
 src/
@@ -84,7 +84,8 @@ src/
             multi-layer screen root) and color's outline-colour helpers
   perf/     Pool, a retained-scene-graph node pool
   animation/  Tween and Shake (both dtMs-driven), easing curves, lerp
-  haptics/  fail-soft vibration feedback (the host injects expo-haptics)
+  haptics/  fail-soft vibration feedback — NOT in the root barrel; import
+            from 'pixi-rn/haptics' (the host injects expo-haptics)
   audio/    pooled expo-audio playback — NOT in the root barrel; import
             from 'pixi-rn/audio' (needs `npx expo install expo-audio`)
 testing/    an EXGL-faithful mock GL context for offline smoke tests
