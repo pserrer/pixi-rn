@@ -4,6 +4,33 @@ All notable changes to `pixi-rn` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] - 2026-08-13
+
+### Changed
+
+- `haptics` now routes through Android's **haptic engine**
+  (`performAndroidHapticsAsync` → `View.performHapticFeedback`) instead of the
+  raw `Vibrator` waveforms `expo-haptics`' cross-platform cues use there. The
+  API is unchanged — `impactAsync`/`selectionAsync`/`notificationAsync` keep
+  working exactly as before — but on Android they now produce the platform's
+  own tuned effects rather than a hand-rolled pulse.
+
+  This is `expo-haptics`' own recommendation ("Android's `Vibrator` API is not
+  recommended for implementing haptics feedback"), and the numbers explain why:
+  the strongest cross-platform cue, `impactAsync('heavy')`, is a single 60ms
+  pulse at amplitude 70 out of 255 — about 27%. Against a sound effect and a
+  screen shake, that is easy to miss entirely.
+
+  Engine effects are semantic rather than intensities, so the mapping is by
+  meaning: an impact becomes `Reject` ("the rejection or failure of a user
+  interaction" — which is what a collision is), a success notification becomes
+  `Confirm`, a selection becomes `Segment_Tick`. Feature-detected, so an older
+  `expo-haptics` keeps the previous behaviour, and iOS is untouched.
+
+  ⚠️ One trade worth knowing: the engine path RESPECTS the system "touch
+  feedback" setting, where the raw `Vibrator` path ignores it. A user who has
+  turned haptics off system-wide will now correctly feel nothing.
+
 ## [0.7.0] - 2026-08-13
 
 ### Changed

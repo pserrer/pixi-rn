@@ -41,6 +41,40 @@ event handling, where awaiting a native round-trip would sit between the
 simulation step and the render; and a rejection (no vibrator, permission
 withheld) must never surface as an unhandled promise rejection.
 
+## Android uses the haptic engine
+
+`expo-haptics`' three cross-platform cues are implemented on Android as
+hand-rolled `Vibrator` waveforms, and they are **quiet**. The strongest of them,
+`impactAsync('heavy')`, is a single 60ms pulse at amplitude 70 out of 255 —
+about 27%. In a game, against a sound effect and a screen shake, that is easy to
+miss entirely.
+
+`expo-haptics`' own documentation says as much: _"Android's `Vibrator` API is
+not recommended for implementing haptics feedback. Instead, you should use
+`performAndroidHapticsAsync`."_ That calls `View.performHapticFeedback` and gets
+the platform's real, tuned effects — the ones system UI itself uses.
+
+This module does that for you. The API above is unchanged; on Android each cue
+is mapped onto the engine's semantic effects instead:
+
+| cue                               | Android engine effect |
+| --------------------------------- | --------------------- |
+| `impactAsync(…, 'heavy')`         | `Reject`              |
+| `impactAsync(…, 'medium')`        | `Context_Click`       |
+| `selectionAsync`                  | `Segment_Tick`        |
+| `notificationAsync(…, 'success')` | `Confirm`             |
+
+The effects are semantic rather than intensities, so the mapping is by meaning —
+`Reject` is "the rejection or failure of a user interaction", which is exactly
+what a collision is. It's feature-detected, so an older `expo-haptics` keeps the
+`Vibrator` path, and iOS is untouched.
+
+<Callout type="warn" title="One behavioural trade">
+  The engine path **respects the system "touch feedback" setting**, where the raw `Vibrator` path ignores it. A user who
+  has turned haptics off system-wide will now correctly feel nothing — which is the right behaviour, but worth knowing
+  when a device seems silent.
+</Callout>
+
 ## Installation
 
 Haptics live behind their own entry point, `pixi-rn/haptics` — the same rule
