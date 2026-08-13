@@ -46,11 +46,11 @@ withheld) must never surface as an unhandled promise rejection.
 There are three ways to make an Android phone buzz, and for **game** feedback
 only one of them is dependable:
 
-| approach                                                   | amplitude          | suppressed by                        |
-| ---------------------------------------------------------- | ------------------ | ------------------------------------ |
-| `expo-haptics`' cross-platform cues (`Vibrator` waveforms) | ≤ 70/255 (~27%)    | —                                    |
-| `performAndroidHapticsAsync` (the haptic engine)           | the platform's own | **the system haptic-feedback level** |
-| `Vibration.vibrate` (React Native core)                    | full               | —                                    |
+| approach                                                   | amplitude          | suppressed by the haptic-feedback level |
+| ---------------------------------------------------------- | ------------------ | --------------------------------------- |
+| `expo-haptics`' cross-platform cues (`Vibrator` waveforms) | ≤ 70/255 (~27%)    | **yes** (no usage attributes)           |
+| `performAndroidHapticsAsync` (the haptic engine)           | the platform's own | **yes** (gated outright)                |
+| `Vibration.vibrate` (React Native core)                    | full               | **yes** (no usage attributes)           |
 
 The engine feels best, and it is what this module used in `0.8.0`. It has a
 trapdoor: when the system's haptic-feedback level is **0**, it does nothing —
@@ -64,11 +64,18 @@ It runs the motor at full amplitude and is governed by neither the
 touch-feedback level nor the keyboard one. iOS keeps `expo-haptics`, where the
 impact generators are the right thing and have no equivalent trapdoor.
 
-<Callout type="warn" title="This bypasses a system setting on purpose">
-  The touch-feedback level governs **UI** feedback — keyboard taps, button presses — and a game's collision cue is not
-  that. Android itself separates the two: its settings screen carries an independent "media vibration" level. The user's
-  control over game haptics is therefore **your app's own toggle**, which every function here takes as its first
-  argument. If your app doesn't have one, add it before using this module.
+<Callout type="warn" title="None of these escapes the system setting">
+  All three are silenced when the system's haptic-feedback level is 0 — verified on a device, where every one of them is
+  inaudible and none reports anything wrong. This module picks `Vibration.vibrate` because it is the strongest of the
+  three when haptics *are* enabled, not because it bypasses anything. An earlier version of this page claimed it did;
+  that was wrong.
+
+Bypassing the setting needs **native code** attaching `AudioAttributes.USAGE_MEDIA`, which lands on the separate
+media-vibration channel Android keeps. That is deliberately out of scope here: shipping native code would cost every
+consumer their Expo Go workflow, and overriding a user's stated OS preference is a decision only an app — one with its
+own vibration toggle — has standing to make. If you need it, put a small Expo module in your own app; every function
+here takes your toggle as its first argument either way.
+
 </Callout>
 
 ## Installation

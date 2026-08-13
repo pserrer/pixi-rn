@@ -11,8 +11,8 @@ import * as Haptics from 'expo-haptics';
  *
  * ## Android drives the vibrator directly
  *
- * There are three ways to make an Android phone buzz, and for GAME feedback
- * only one of them is dependable:
+ * There are three ways to make an Android phone buzz. This module picks the
+ * strongest; none of them escapes the system's haptic-feedback level (below):
  *
  * 1. `expo-haptics`' cross-platform cues → hand-rolled `Vibrator` waveforms,
  *    capped at amplitude 70 of 255 (~27%) for the strongest of them. Quiet
@@ -25,20 +25,25 @@ import * as Haptics from 'expo-haptics';
  *    cost five rounds of debugging against a real device before the setting was
  *    found; nothing observable from inside the app distinguishes it from a
  *    device with no vibrator.
- * 3. `Vibration.vibrate` (React Native core) → the vibrator at FULL amplitude
- *    for a given duration, governed by neither the touch-feedback level nor the
- *    keyboard one.
+ * 3. `Vibration.vibrate` (React Native core) → the vibrator at full amplitude
+ *    for a given duration.
  *
- * This module uses (3) on Android and `expo-haptics` on iOS, where the impact
- * generators are the right thing and have no equivalent trapdoor.
+ * This module uses (3) on Android — it is the strongest of the three — and
+ * `expo-haptics` on iOS, where the impact generators are the right thing.
  *
- * ⚠️ **This deliberately bypasses the system's touch-feedback level.** That
- * setting governs UI touch feedback — keyboard taps, button presses — and a
- * game's collision cue is not that; Android itself separates the two (its
- * settings screen has an independent "media vibration" level). The user's
- * control over game haptics is the HOST APP's own toggle, which every function
- * here takes as its first argument and which must be honoured. If your app has
- * no such toggle, add one before using this.
+ * ⚠️ **None of the three escapes the system's haptic-feedback level**, and an
+ * earlier version of this comment wrongly claimed (3) did. RN passes no
+ * `VibrationAttributes`, so the platform treats the effect as USAGE_UNKNOWN and
+ * scales it by the touch-feedback intensity — at 0, to silence. Verified on a
+ * device: with that level at 0, all three are inaudible and none reports
+ * anything wrong. Bypassing it needs native code that attaches
+ * `AudioAttributes.USAGE_MEDIA` (Android keeps a separate media-vibration
+ * level); that is a host-app concern, since it means overriding a user's stated
+ * OS preference and only an app with its own vibration toggle has standing to
+ * do it.
+ *
+ * Every function takes the user's own on/off setting as its first argument, and
+ * every caller must honour it — a host without such a toggle should add one.
  *
  * @example
  * ```ts

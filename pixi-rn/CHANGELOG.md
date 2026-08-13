@@ -4,6 +4,24 @@ All notable changes to `pixi-rn` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/).
 
+## [0.10.1] - 2026-08-13
+
+### Fixed
+
+- **Documentation correction.** 0.10.0 claimed `Vibration.vibrate` is "governed
+  by neither the touch-feedback level nor the keyboard one". That is wrong, and
+  a device disproved it: React Native passes no `VibrationAttributes`, so the
+  platform treats the effect as USAGE_UNKNOWN and scales it by the same
+  haptic-feedback intensity. With that level at 0, **all three** Android
+  approaches are silent and none reports anything wrong.
+
+  The behaviour is unchanged — `Vibration.vibrate` is still the strongest of the
+  three when haptics are enabled, which is why it stays — but it is no longer
+  described as a bypass. Escaping the setting requires native code attaching
+  `AudioAttributes.USAGE_MEDIA`, which is deliberately out of scope: shipping
+  native code would cost every consumer their Expo Go workflow, and overriding a
+  user's stated OS preference is a call only a host app can make.
+
 ## [0.10.0] - 2026-08-13
 
 ### Changed
