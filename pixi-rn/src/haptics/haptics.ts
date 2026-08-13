@@ -77,15 +77,49 @@ const ANDROID_NOTIFICATION = {
   error: Haptics.AndroidHaptics?.Reject,
 };
 
+/** What the module knows about its own state — see {@link hapticsDiagnostics}. */
+export interface HapticsDiagnostics {
+  /** `Platform.OS`. */
+  platform: string;
+  /** True when the Android haptic-engine path is in use rather than the raw
+   *  `Vibrator` waveforms. Always false off Android. */
+  engine: boolean;
+  /** Cues requested since launch. A cue that was requested but not felt is the
+   *  interesting case: it proves the call path works and moves the question to
+   *  the device. */
+  calls: number;
+  /** The last failure from a cue, if any. `null` means every call so far was
+   *  accepted by the native side. */
+  lastError: string | null;
+}
+
+let calls = 0;
+let lastError: string | null = null;
+
+/**
+ * Report what this module knows about itself. Nothing here can tell you whether
+ * the user FELT anything — no platform exposes that — but it does separate "the
+ * app never asked" from "the app asked and the device declined" from "the app
+ * asked, the device accepted, and it was still imperceptible", which is
+ * otherwise indistinguishable from the outside.
+ */
+export function hapticsDiagnostics(): HapticsDiagnostics {
+  return { platform: String(Platform.OS), engine: useEngine, calls, lastError };
+}
+
 // Fire-and-forget. These are typically called from a frame loop's event
 // handling, where awaiting a native round-trip would sit between the simulation
 // step and the render; and a rejection (no vibrator, permission withheld) must
-// never surface as an unhandled promise rejection.
+// never surface as an unhandled promise rejection — it is recorded for
+// `hapticsDiagnostics` instead of thrown.
 function fire(run: () => Promise<void>): void {
+  calls++;
   try {
-    void run().catch(() => {});
-  } catch {
-    /* best-effort */
+    void run().catch((err: unknown) => {
+      lastError = err instanceof Error ? err.message : String(err);
+    });
+  } catch (err) {
+    lastError = err instanceof Error ? err.message : String(err);
   }
 }
 

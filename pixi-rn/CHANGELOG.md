@@ -4,6 +4,18 @@ All notable changes to `pixi-rn` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/).
 
+## [0.9.0] - 2026-08-13
+
+### Added
+
+- `hapticsDiagnostics()` — reports the module's own state: the platform, whether
+  the Android engine path is active, how many cues have been requested, and the
+  last native failure if there was one. Nothing can tell you whether a user
+  _felt_ anything — no platform exposes that — but this separates "the app never
+  asked" from "the app asked and the device declined" from "the app asked, the
+  device accepted, and it was still imperceptible", which are otherwise
+  indistinguishable from outside the device.
+
 ## [0.8.0] - 2026-08-13
 
 ### Changed
