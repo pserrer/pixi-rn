@@ -86,7 +86,7 @@ src/
   animation/  Tween and Shake (both dtMs-driven), easing curves, lerp
   haptics/  fail-soft vibration feedback — NOT in the root barrel; import
             from 'pixi-rn/haptics' (needs `npx expo install expo-haptics`;
-            installing @pixi-rn/haptics upgrades Android to the media
+            installing @pixi-rn/media-vibration upgrades Android to the media
             vibration channel, no import and no call-site change)
   audio/    pooled expo-audio playback — NOT in the root barrel; import
             from 'pixi-rn/audio' (needs `npx expo install expo-audio`)

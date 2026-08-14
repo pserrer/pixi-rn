@@ -1,4 +1,4 @@
-# `@pixi-rn/haptics`
+# `@pixi-rn/media-vibration`
 
 Android vibration on the **media** usage channel, for [`pixi-rn`](https://github.com/pserrer/pixi-rn).
 
@@ -22,7 +22,7 @@ instead.
 ## Install
 
 ```sh
-npm install pixi-rn @pixi-rn/haptics
+npm install pixi-rn @pixi-rn/media-vibration
 ```
 
 That's the whole integration. `pixi-rn/haptics` looks this module up by name at

@@ -10,7 +10,7 @@
 // vibrator without pixi-rn's cue vocabulary.
 import { requireOptionalNativeModule } from 'expo';
 
-export interface PixiRnHapticsModule {
+export interface PixiRnMediaVibrationModule {
   /** Whether this device has a vibrator at all. */
   isAvailable(): boolean;
   /** One pulse, `durationMs` long, at `amplitude` (1..255). */
@@ -23,4 +23,4 @@ export interface PixiRnHapticsModule {
 
 /** Null on iOS, in Expo Go, in an offline export, or on any build that doesn't
  *  have this package's native side compiled in. */
-export const PixiRnHaptics = requireOptionalNativeModule<PixiRnHapticsModule>('PixiRnHaptics');
+export const PixiRnMediaVibration = requireOptionalNativeModule<PixiRnMediaVibrationModule>('PixiRnMediaVibration');

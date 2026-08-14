@@ -1,6 +1,6 @@
 {
   "name": "pixi-rn",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "description": "pixi.js v8 inside React Native on expo-gl: renderer bring-up, retained flex layout, federated native input, texture upload, bitmap text, a frame loop, expo-audio pooling, and a dtMs-driven tween.",
   "license": "MIT",
   "private": false,
@@ -76,6 +76,14 @@
     "pixi.js": "^8.0.0",
     "react": "*",
     "react-native": "*"
+  },
+  "peerDependenciesMeta": {
+    "expo-audio": {
+      "optional": true
+    },
+    "expo-haptics": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "tsdown": "^0.22.14",

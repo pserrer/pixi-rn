@@ -38,7 +38,7 @@ import * as Haptics from 'expo-haptics';
  * a device: with that level at 0, all three are inaudible and none reports
  * anything wrong.
  *
- * ## `@pixi-rn/haptics`, when the setting must not win
+ * ## `@pixi-rn/media-vibration`, when the setting must not win
  *
  * Installing that companion package upgrades every cue here to Android's MEDIA
  * vibration channel, which the haptic-feedback level does not touch. It is
@@ -80,13 +80,13 @@ const NOTIFICATION_TYPES = {
 
 const ANDROID = Platform.OS === 'android';
 
-// The optional companion. Looked up by NAME — importing `@pixi-rn/haptics`
+// The optional companion. Looked up by NAME — importing `@pixi-rn/media-vibration`
 // would make it a hard dependency, which is exactly what must not happen.
 interface MediaVibrator {
   vibrate(durationMs: number, amplitude: number): void;
   vibratePattern(pattern: number[]): void;
 }
-const media = ANDROID ? requireOptionalNativeModule<MediaVibrator>('PixiRnHaptics') : null;
+const media = ANDROID ? requireOptionalNativeModule<MediaVibrator>('PixiRnMediaVibration') : null;
 
 // Durations in ms. `Vibration.vibrate(ms)` runs the motor at full amplitude for
 // that long, so these are shorter than the equivalent expo-haptics waveforms —
@@ -111,7 +111,7 @@ const ANDROID_NOTIFICATION_MS = {
 export interface HapticsDiagnostics {
   /** `Platform.OS`. */
   platform: string;
-  /** Which implementation is in use. `media` means `@pixi-rn/haptics` is
+  /** Which implementation is in use. `media` means `@pixi-rn/media-vibration` is
    *  installed and cues are on Android's media channel, immune to the system
    *  haptic-feedback level; `vibrator` is the portable Android path, which is
    *  not. */

@@ -1,4 +1,4 @@
-package net.pixirn.haptics
+package net.pixirn.mediavibration
 
 import android.content.Context
 import android.media.AudioAttributes
@@ -44,7 +44,7 @@ import expo.modules.kotlin.modules.ModuleDefinition
  * overload taking AudioAttributes works from API 21 and is the long-standing
  * way games ask for a non-touch vibration.
  */
-class PixiRnHapticsModule : Module() {
+class PixiRnMediaVibrationModule : Module() {
   private val context: Context
     get() = appContext.reactContext ?: throw Exceptions.ReactContextLost()
 
@@ -64,7 +64,7 @@ class PixiRnHapticsModule : Module() {
     .build()
 
   override fun definition() = ModuleDefinition {
-    Name("PixiRnHaptics")
+    Name("PixiRnMediaVibration")
 
     /** True when this device actually has a vibrator to drive. */
     Function("isAvailable") {
@@ -73,19 +73,34 @@ class PixiRnHapticsModule : Module() {
 
     /** One pulse of `durationMs` at `amplitude` (1..255, full by default). */
     Function("vibrate") { durationMs: Int, amplitude: Int ->
-      val amp = amplitude.coerceIn(1, 255)
-      @Suppress("DEPRECATION")
-      vibrator.vibrate(VibrationEffect.createOneShot(durationMs.toLong(), amp), mediaAttributes)
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val amp = amplitude.coerceIn(1, 255)
+        @Suppress("DEPRECATION")
+        vibrator.vibrate(VibrationEffect.createOneShot(durationMs.toLong(), amp), mediaAttributes)
+      } else {
+        // VibrationEffect is API 26, and minSdk here is 24. The legacy
+        // overload takes the same AudioAttributes from API 21, so the media
+        // channel — the whole point of this module — still applies; only
+        // amplitude control is unavailable, and the motor runs at full.
+        @Suppress("DEPRECATION")
+        vibrator.vibrate(durationMs.toLong(), mediaAttributes)
+      }
     }
 
     /** A [wait, buzz, wait, buzz, …] waveform, in ms, at full amplitude. */
     Function("vibratePattern") { pattern: List<Int> ->
       val timings = pattern.map { it.toLong() }.toLongArray()
-      // Alternating off/on, starting with off — the same convention as
-      // Vibrator's own legacy pattern API.
-      val amplitudes = IntArray(timings.size) { if (it % 2 == 0) 0 else 255 }
-      @Suppress("DEPRECATION")
-      vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1), mediaAttributes)
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        // Alternating off/on, starting with off — the same convention as
+        // Vibrator's own legacy pattern API.
+        val amplitudes = IntArray(timings.size) { if (it % 2 == 0) 0 else 255 }
+        @Suppress("DEPRECATION")
+        vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1), mediaAttributes)
+      } else {
+        // Same off/on convention, which is where that convention came from.
+        @Suppress("DEPRECATION")
+        vibrator.vibrate(timings, -1, mediaAttributes)
+      }
     }
 
     Function("cancel") {

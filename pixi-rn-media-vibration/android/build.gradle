@@ -3,11 +3,11 @@ plugins {
   id 'expo-module-gradle-plugin'
 }
 
-group = 'net.pixirn.haptics'
+group = 'net.pixirn.mediavibration'
 version = '0.1.0'
 
 android {
-  namespace "net.pixirn.haptics"
+  namespace "net.pixirn.mediavibration"
   defaultConfig {
     minSdkVersion 24
   }

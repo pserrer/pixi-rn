@@ -4,11 +4,41 @@ All notable changes to `pixi-rn` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/).
 
+## [0.11.1] - 2026-08-14
+
+### Fixed
+
+- The optional companion is **`@pixi-rn/media-vibration`**, not
+  `@pixi-rn/haptics`. `0.11.0` shipped looking up a native module name
+  (`PixiRnHaptics`) belonging to a package that was never published, so the
+  media-channel upgrade could not engage for anyone. The lookup is now
+  `PixiRnMediaVibration`, matching the package that actually exists.
+
+  The rename is also the point: `pixi-rn/haptics` is an entry point you
+  _import_, `@pixi-rn/media-vibration` is a package you _install_ and never
+  import. One `@` apart, the old pair read as a typo for each other.
+
+- `expo-audio` and `expo-haptics` are now `peerDependenciesMeta` **optional**.
+  They back the two entry points that are deliberately kept out of the root
+  barrel, so that a consumer only takes on a native dependency for a feature
+  they use — but npm 7+ installs peer dependencies automatically, so
+  `npm install pixi-rn` was pulling both in regardless, and autolinking
+  compiles a native Expo module into the build whether or not anything
+  imports it. The subpath fixed the bundler half of this; it could not fix
+  the install half. Verified with `npm install --dry-run` against a packed
+  tarball: neither lands now, while the genuinely required peers still do.
+
+  If you use `pixi-rn/audio` or `pixi-rn/haptics`, install its package
+  yourself — `npx expo install expo-audio` / `expo-haptics` — as the docs for
+  both already instructed.
+
 ## [0.11.0] - 2026-08-14
 
 ### Added
 
-- Optional companion package **`@pixi-rn/haptics`**. Install it alongside
+- Optional companion package **`@pixi-rn/haptics`** (renamed to
+  `@pixi-rn/media-vibration` in 0.11.1, and never published under this name).
+  Install it alongside
   `pixi-rn` and every cue in `pixi-rn/haptics` upgrades to Android's MEDIA
   vibration channel, which the system's haptic-feedback level does not touch —
   no import, no registration, no change at any call site. Without it the cues
