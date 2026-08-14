@@ -1,9 +1,11 @@
 name: Deploy docs
 
-# Lives inside packages/pixi-rn so the subtree mirror carries it into the
-# public repo's own .github/workflows/ — it then runs as THAT repo's Actions,
-# using its own GITHUB_TOKEN (no cross-repo PAT needed), firing right after
-# the private repo's mirror workflow pushes new content to this repo's main.
+# Lives inside packages/ so the subtree mirror carries it into the public
+# repo's own .github/workflows/ — it then runs as THAT repo's Actions, using
+# its own GITHUB_TOKEN (no cross-repo PAT needed), firing right after the
+# private repo's mirror workflow pushes new content to this repo's main.
+# ⚠️ The split prefix is `packages`, so the public repo's ROOT is this folder:
+# every path below is relative to it, and pixi-rn is a SUBDIRECTORY.
 on:
   push:
     branches: [main]
@@ -30,17 +32,19 @@ jobs:
 
       - name: Install pixi-rn deps
         run: npm install
+        working-directory: pixi-rn
 
       - name: Build API reference (TypeDoc)
         run: npm run docs
+        working-directory: pixi-rn
 
       - name: Install docs-site deps
         run: npm ci
-        working-directory: docs-site
+        working-directory: pixi-rn/docs-site
 
       - name: Build guide site (Fumadocs + embedded API reference)
         run: npm run build
-        working-directory: docs-site
+        working-directory: pixi-rn/docs-site
         env:
           # GitHub Pages serves a project site under /<repo>/, not the domain
           # root — see docs-site/next.config.mjs for why this is conditional.
@@ -50,7 +54,7 @@ jobs:
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: docs-site/out
+          path: pixi-rn/docs-site/out
 
   deploy:
     needs: build

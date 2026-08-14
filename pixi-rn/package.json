@@ -1,12 +1,13 @@
 {
   "name": "pixi-rn",
-  "version": "0.10.1",
+  "version": "0.11.0",
   "description": "pixi.js v8 inside React Native on expo-gl: renderer bring-up, retained flex layout, federated native input, texture upload, bitmap text, a frame loop, expo-audio pooling, and a dtMs-driven tween.",
   "license": "MIT",
   "private": false,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pserrer/pixi-rn.git"
+    "url": "git+https://github.com/pserrer/pixi-rn.git",
+    "directory": "pixi-rn"
   },
   "homepage": "https://github.com/pserrer/pixi-rn#readme",
   "bugs": {
@@ -67,6 +68,7 @@
     "ui"
   ],
   "peerDependencies": {
+    "expo": "*",
     "expo-asset": "*",
     "expo-audio": "*",
     "expo-gl": "*",

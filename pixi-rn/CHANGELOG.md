@@ -4,6 +4,29 @@ All notable changes to `pixi-rn` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/).
 
+## [0.11.0] - 2026-08-14
+
+### Added
+
+- Optional companion package **`@pixi-rn/haptics`**. Install it alongside
+  `pixi-rn` and every cue in `pixi-rn/haptics` upgrades to Android's MEDIA
+  vibration channel, which the system's haptic-feedback level does not touch —
+  no import, no registration, no change at any call site. Without it the cues
+  keep working on the portable path and keep following that setting.
+
+  It is discovered by NATIVE MODULE NAME at runtime rather than imported, which
+  is what keeps it optional: this package takes no dependency on it. A separate
+  package rather than a subpath because **autolinking is install-level** — native
+  code inside `pixi-rn` would be compiled into every consumer's build regardless
+  of imports, costing them Expo Go. No import boundary can prevent that; a
+  package boundary can.
+
+- `hapticsDiagnostics().path` gains `'media'`, reported when that companion is
+  installed and cues are immune to the system setting.
+
+- `expo` joins `peerDependencies` (for `requireOptionalNativeModule`). Every
+  Expo app already has it.
+
 ## [0.10.1] - 2026-08-13
 
 ### Fixed

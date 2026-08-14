@@ -1,4 +1,5 @@
 import { Platform, Vibration } from 'react-native';
+import { requireOptionalNativeModule } from 'expo';
 import * as Haptics from 'expo-haptics';
 
 /**
@@ -28,19 +29,24 @@ import * as Haptics from 'expo-haptics';
  * 3. `Vibration.vibrate` (React Native core) → the vibrator at full amplitude
  *    for a given duration.
  *
- * This module uses (3) on Android — it is the strongest of the three — and
+ * This module uses (3) on Android — the strongest of the three — and
  * `expo-haptics` on iOS, where the impact generators are the right thing.
  *
- * ⚠️ **None of the three escapes the system's haptic-feedback level**, and an
- * earlier version of this comment wrongly claimed (3) did. RN passes no
- * `VibrationAttributes`, so the platform treats the effect as USAGE_UNKNOWN and
- * scales it by the touch-feedback intensity — at 0, to silence. Verified on a
- * device: with that level at 0, all three are inaudible and none reports
- * anything wrong. Bypassing it needs native code that attaches
- * `AudioAttributes.USAGE_MEDIA` (Android keeps a separate media-vibration
- * level); that is a host-app concern, since it means overriding a user's stated
- * OS preference and only an app with its own vibration toggle has standing to
- * do it.
+ * ⚠️ **None of the three escapes the system's haptic-feedback level.** RN passes
+ * no `VibrationAttributes`, so the platform treats the effect as USAGE_UNKNOWN
+ * and scales it by the touch-feedback intensity — at 0, to silence. Verified on
+ * a device: with that level at 0, all three are inaudible and none reports
+ * anything wrong.
+ *
+ * ## `@pixi-rn/haptics`, when the setting must not win
+ *
+ * Installing that companion package upgrades every cue here to Android's MEDIA
+ * vibration channel, which the haptic-feedback level does not touch. It is
+ * discovered by NATIVE MODULE NAME at runtime and never imported, which is what
+ * keeps it optional: this package has no dependency on it, and a consumer who
+ * doesn't install it keeps their Expo Go workflow. Autolinking is install-level,
+ * so a separate package is the only boundary that actually holds — an import
+ * boundary would not.
  *
  * Every function takes the user's own on/off setting as its first argument, and
  * every caller must honour it — a host without such a toggle should add one.
@@ -74,6 +80,14 @@ const NOTIFICATION_TYPES = {
 
 const ANDROID = Platform.OS === 'android';
 
+// The optional companion. Looked up by NAME — importing `@pixi-rn/haptics`
+// would make it a hard dependency, which is exactly what must not happen.
+interface MediaVibrator {
+  vibrate(durationMs: number, amplitude: number): void;
+  vibratePattern(pattern: number[]): void;
+}
+const media = ANDROID ? requireOptionalNativeModule<MediaVibrator>('PixiRnHaptics') : null;
+
 // Durations in ms. `Vibration.vibrate(ms)` runs the motor at full amplitude for
 // that long, so these are shorter than the equivalent expo-haptics waveforms —
 // those pad their length to compensate for running at a quarter power.
@@ -97,8 +111,11 @@ const ANDROID_NOTIFICATION_MS = {
 export interface HapticsDiagnostics {
   /** `Platform.OS`. */
   platform: string;
-  /** Which implementation is in use: the Android vibrator, or `expo-haptics`. */
-  path: 'vibrator' | 'expo-haptics';
+  /** Which implementation is in use. `media` means `@pixi-rn/haptics` is
+   *  installed and cues are on Android's media channel, immune to the system
+   *  haptic-feedback level; `vibrator` is the portable Android path, which is
+   *  not. */
+  path: 'media' | 'vibrator' | 'expo-haptics';
   /** Cues requested since launch. */
   calls: number;
   /** The last failure from a cue, if any. ⚠️ `null` does NOT prove the device
@@ -115,7 +132,8 @@ let lastError: string | null = null;
  * app never asked" from "the app asked and something threw".
  */
 export function hapticsDiagnostics(): HapticsDiagnostics {
-  return { platform: String(Platform.OS), path: ANDROID ? 'vibrator' : 'expo-haptics', calls, lastError };
+  const path = media ? 'media' : ANDROID ? 'vibrator' : 'expo-haptics';
+  return { platform: String(Platform.OS), path, calls, lastError };
 }
 
 // Fire-and-forget. These are typically called from a frame loop's event
@@ -140,7 +158,8 @@ function fire(run: () => Promise<void> | void): void {
  */
 export function impactAsync(enabled: boolean, style: HapticImpactStyle = 'medium'): void {
   if (!enabled) return;
-  if (ANDROID) fire(() => Vibration.vibrate(ANDROID_IMPACT_MS[style]));
+  if (media) fire(() => media.vibrate(ANDROID_IMPACT_MS[style], 255));
+  else if (ANDROID) fire(() => Vibration.vibrate(ANDROID_IMPACT_MS[style]));
   else fire(() => Haptics.impactAsync(IMPACT_STYLES[style]));
 }
 
@@ -148,13 +167,15 @@ export function impactAsync(enabled: boolean, style: HapticImpactStyle = 'medium
  *  slider passing a detent). */
 export function selectionAsync(enabled: boolean): void {
   if (!enabled) return;
-  if (ANDROID) fire(() => Vibration.vibrate(10));
+  if (media) fire(() => media.vibrate(10, 255));
+  else if (ANDROID) fire(() => Vibration.vibrate(10));
   else fire(() => Haptics.selectionAsync());
 }
 
 /** An outcome cue — a purchase clearing, an action being rejected. */
 export function notificationAsync(enabled: boolean, type: 'success' | 'warning' | 'error' = 'success'): void {
   if (!enabled) return;
-  if (ANDROID) fire(() => Vibration.vibrate(ANDROID_NOTIFICATION_MS[type]));
+  if (media) fire(() => media.vibratePattern(ANDROID_NOTIFICATION_MS[type]));
+  else if (ANDROID) fire(() => Vibration.vibrate(ANDROID_NOTIFICATION_MS[type]));
   else fire(() => Haptics.notificationAsync(NOTIFICATION_TYPES[type]));
 }

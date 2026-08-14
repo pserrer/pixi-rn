@@ -1,13 +1,18 @@
 name: Publish to npm
 
-# Lives inside packages/pixi-rn so the subtree mirror carries it into the
-# public repo's own .github/workflows/ — it runs there, firing right after
-# the private repo's mirror workflow pushes a version bump to this repo's
-# main. Publishes via npm Trusted Publishing (OIDC) — no NPM_TOKEN secret,
-# no long-lived credential at all. Requires a one-time manual first publish
-# (npm has no PyPI-style "reserve before it exists" flow) and a Trusted
-# Publisher configured on the pixi-rn package's npmjs.com settings page,
-# pointing at this exact repo + workflow filename.
+# Lives inside packages/ so the subtree mirror carries it into the public
+# repo's own .github/workflows/ — it runs there, firing right after the private
+# repo's mirror workflow pushes a version bump to this repo's main. Publishes
+# via npm Trusted Publishing (OIDC) — no NPM_TOKEN secret, no long-lived
+# credential at all.
+#
+# ⚠️ Each package needs a one-time manual first publish (npm has no PyPI-style
+# "reserve before it exists" flow) and its own Trusted Publisher configured on
+# its npmjs.com settings page, pointing at this repo + THIS FILENAME. Keeping
+# every package in one matrix inside one file is what lets them share that
+# configuration shape — renaming this file breaks both.
+# ⚠️ A SCOPED package (@pixi-rn/haptics) defaults to private on npm, so its
+# first manual publish needs --access public.
 on:
   push:
     branches: [main]
@@ -24,6 +29,17 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dir: pixi-rn
+            name: pixi-rn
+          - dir: pixi-rn-haptics
+            name: '@pixi-rn/haptics'
+    defaults:
+      run:
+        working-directory: ${{ matrix.dir }}
     steps:
       - uses: actions/checkout@v4
 
@@ -36,6 +52,7 @@ jobs:
       # older than that, so upgrade it before anything else touches npm.
       - name: Upgrade npm for trusted publishing support
         run: npm install -g npm@latest
+        working-directory: .
 
       # Every mirror sync pushes to main, not just version bumps — skip
       # publishing (rather than letting `npm publish` fail loudly) when the
@@ -44,11 +61,11 @@ jobs:
         id: check
         run: |
           CURRENT_VERSION=$(node -p "require('./package.json').version")
-          if npm view "pixi-rn@$CURRENT_VERSION" version >/dev/null 2>&1; then
-            echo "Already published: pixi-rn@$CURRENT_VERSION"
+          if npm view "${{ matrix.name }}@$CURRENT_VERSION" version >/dev/null 2>&1; then
+            echo "Already published: ${{ matrix.name }}@$CURRENT_VERSION"
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
           else
-            echo "Not yet published: pixi-rn@$CURRENT_VERSION"
+            echo "Not yet published: ${{ matrix.name }}@$CURRENT_VERSION"
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
           fi
 

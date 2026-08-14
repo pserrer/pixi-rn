@@ -1,0 +1,30 @@
+{
+  "name": "@pixi-rn/haptics",
+  "version": "0.1.0",
+  "description": "Android vibration on the MEDIA usage channel, so game feedback survives the system's haptic-feedback level. Companion to pixi-rn.",
+  "license": "MIT",
+  "main": "index.ts",
+  "files": [
+    "index.ts",
+    "expo-module.config.json",
+    "android",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "react-native",
+    "expo",
+    "haptics",
+    "vibration",
+    "android"
+  ],
+  "peerDependencies": {
+    "expo": "*",
+    "react-native": "*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pserrer/pixi-rn.git",
+    "directory": "pixi-rn-haptics"
+  }
+}

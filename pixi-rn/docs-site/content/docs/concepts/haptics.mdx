@@ -43,8 +43,8 @@ withheld) must never surface as an unhandled promise rejection.
 
 ## Android drives the vibrator directly
 
-There are three ways to make an Android phone buzz, and for **game** feedback
-only one of them is dependable:
+There are three ways to make an Android phone buzz from JS, and **all three are
+silenced by the same system setting**:
 
 | approach                                                   | amplitude          | suppressed by the haptic-feedback level |
 | ---------------------------------------------------------- | ------------------ | --------------------------------------- |
@@ -59,9 +59,9 @@ whether it performed, `expo-haptics` discards that boolean, so the call resolves
 successfully having produced no vibration at all. Nothing observable from inside
 the app distinguishes that from a device with no vibrator.
 
-So on Android this module now calls `Vibration.vibrate` with per-cue durations.
-It runs the motor at full amplitude and is governed by neither the
-touch-feedback level nor the keyboard one. iOS keeps `expo-haptics`, where the
+So on Android this module calls `Vibration.vibrate` with per-cue durations: of
+the three it is the strongest when haptics are enabled, running the motor at
+full amplitude rather than a quarter of it. iOS keeps `expo-haptics`, where the
 impact generators are the right thing and have no equivalent trapdoor.
 
 <Callout type="warn" title="None of these escapes the system setting">
@@ -70,12 +70,40 @@ impact generators are the right thing and have no equivalent trapdoor.
   three when haptics *are* enabled, not because it bypasses anything. An earlier version of this page claimed it did;
   that was wrong.
 
-Bypassing the setting needs **native code** attaching `AudioAttributes.USAGE_MEDIA`, which lands on the separate
-media-vibration channel Android keeps. That is deliberately out of scope here: shipping native code would cost every
-consumer their Expo Go workflow, and overriding a user's stated OS preference is a decision only an app — one with its
-own vibration toggle — has standing to make. If you need it, put a small Expo module in your own app; every function
-here takes your toggle as its first argument either way.
+Bypassing the setting needs **native code** — see below. That is deliberately out of scope for this package: shipping
+native code would cost every consumer their Expo Go workflow (autolinking is install-level, so no import boundary can
+contain it), and overriding a user's stated OS preference is a decision only an app — one with its own vibration
+toggle — has standing to make.
 
+</Callout>
+
+## If you need it regardless of the system setting
+
+Install the companion package:
+
+```sh
+npm install @pixi-rn/haptics
+```
+
+That is the entire integration. Every cue above then vibrates on Android's
+**media** channel, which the haptic-feedback level does not touch — no import,
+no registration, no change at any call site. **Verified on a device with haptic
+feedback set to 0: cues buzz, where all three JS paths are silent.**
+
+It works by native-module _name_ lookup at runtime, so this package takes no
+dependency on it: with the companion absent, the same calls fall back to the
+portable path and follow the system setting as before.
+
+<Callout type="warn" title="Why a package and not a subpath">
+  Autolinking is **install-level**. Native code inside `pixi-rn` would be compiled into every consumer's build whether
+  or not they imported it, costing everyone their Expo Go workflow — no import boundary can prevent that, but a package
+  boundary can. It also means installing the companion requires a development or EAS build, and it cannot reach a device
+  over OTA.
+</Callout>
+
+<Callout type="warn">
+  Installing it lets your app vibrate while the user has touch feedback switched off. Only do it if you give the player
+  their own vibration toggle — every function here takes that flag as its first argument, and you must pass it honestly.
 </Callout>
 
 ## Installation

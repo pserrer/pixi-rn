@@ -1,0 +1,14 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'net.pixirn.haptics'
+version = '0.1.0'
+
+android {
+  namespace "net.pixirn.haptics"
+  defaultConfig {
+    minSdkVersion 24
+  }
+}
