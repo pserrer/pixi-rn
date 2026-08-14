@@ -70,10 +70,10 @@ impact generators are the right thing and have no equivalent trapdoor.
   three when haptics *are* enabled, not because it bypasses anything. An earlier version of this page claimed it did;
   that was wrong.
 
-Bypassing the setting needs **native code** — see below. That is deliberately out of scope for this package: shipping
-native code would cost every consumer their Expo Go workflow (autolinking is install-level, so no import boundary can
-contain it), and overriding a user's stated OS preference is a decision only an app — one with its own vibration
-toggle — has standing to make.
+Bypassing the setting needs **native code**, which cannot ship inside this package: autolinking is install-level, so it
+would be compiled into every consumer's build whether or not they imported it, costing everyone their Expo Go
+workflow. It lives in an optional companion package instead — see below — so that overriding a user's stated OS
+preference stays an explicit decision by an app that has its own vibration toggle.
 
 </Callout>
 

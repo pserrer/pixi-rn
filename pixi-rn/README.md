@@ -85,7 +85,9 @@ src/
   perf/     Pool, a retained-scene-graph node pool
   animation/  Tween and Shake (both dtMs-driven), easing curves, lerp
   haptics/  fail-soft vibration feedback — NOT in the root barrel; import
-            from 'pixi-rn/haptics' (the host injects expo-haptics)
+            from 'pixi-rn/haptics' (needs `npx expo install expo-haptics`;
+            installing @pixi-rn/haptics upgrades Android to the media
+            vibration channel, no import and no call-site change)
   audio/    pooled expo-audio playback — NOT in the root barrel; import
             from 'pixi-rn/audio' (needs `npx expo install expo-audio`)
 testing/    an EXGL-faithful mock GL context for offline smoke tests
@@ -359,9 +361,10 @@ this file is catchable with it, in seconds, instead of an EAS build.
 ## API docs
 
 The full API reference is generated with [TypeDoc](https://typedoc.org) from
-the doc comments on every exported symbol — this README becomes its homepage
-(`typedoc.json`'s `readme` option), so it's one static site covering both the
-guide and the reference.
+the doc comments on every exported symbol — one entry point per published
+subpath (`typedoc.json`'s `entryPoints`), so `pixi-rn/audio` and
+`pixi-rn/haptics` are covered alongside the root barrel. **A new subpath needs
+its entry point added there**, or it silently disappears from the reference.
 
 ```sh
 npm run docs                    # from packages/pixi-rn
@@ -374,9 +377,10 @@ with anything that serves static files (`npx serve docs`).
 
 For guides, concepts and worked examples beyond the type-level reference, see
 [`docs-site/`](./docs-site) — a [Fumadocs](https://fumadocs.dev) site
-(`npm run docs:site` from the repo root) that also embeds this generated
-reference at `/api/`. It lives inside this package (not beside it) so that
-mirroring `packages/pixi-rn` alone still carries the whole docs site with it.
+(`npm run docs:site` from the repo root) that converts this generated
+reference into native pages under `/docs/api` at build time. It lives inside
+this package (not beside it) so that mirroring `packages/pixi-rn` alone still
+carries the whole docs site with it.
 
 ## Licence
 

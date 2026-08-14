@@ -7,7 +7,7 @@ description: pixi.js v8 inside React Native, on expo-gl.
 renderer bring-up, texture upload, bitmap text, native touch → Pixi events, a
 small flex layout pass, a retained UI widget kit built on top of it, the
 node-pooling primitive a per-frame layer needs to stay allocation-free,
-pooled `expo-audio` playback, and a dtMs-driven tween.
+pooled `expo-audio` playback, fail-soft haptics, and a dtMs-driven tween.
 
 Each of the failures below cost a device build to even _observe_ before this
 existed to prevent them. They are all silent: a black `GLView`, a dead
@@ -58,5 +58,5 @@ why). `createRenderer` answers the question pixi is actually asking.
   scroll lists, and `UiLayerStack`, the generic screen-swap primitive.
 - **[Examples](/docs/examples/title-screen)** — a few complete screens built
   from the primitives above.
-- **[API Reference](/api/)** — every exported symbol, generated from its own
-  doc comments.
+- **[API Reference](/docs/api)** — every exported symbol, generated from its
+  own doc comments.
