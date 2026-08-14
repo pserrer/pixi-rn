@@ -4,6 +4,19 @@ All notable changes to `@pixi-rn/haptics` are documented here. The format
 follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project follows [Semantic Versioning](https://semver.org/).
 
+## [0.1.1] - 2026-08-14
+
+### Fixed
+
+- **`0.1.0` could not be built at all on Android.** `expo-module-gradle-plugin`
+  requires `versionCode` and `versionName` in `android.defaultConfig`, and
+  `0.1.0` declared neither, so configuring the Gradle project failed with
+  `'android.defaultConfig.versionName' is not defined` — and because
+  autolinking configures every module before anything compiles, it took the
+  whole app build down with it, not just this module. Every Expo module
+  template carries both fields for this reason. Upgrade from `0.1.0`; there is
+  no workaround for it.
+
 ## [0.1.0] - 2026-08-14
 
 ### Added

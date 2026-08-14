@@ -4,11 +4,18 @@ plugins {
 }
 
 group = 'net.pixirn.mediavibration'
-version = '0.1.0'
+version = '0.1.1'
 
 android {
   namespace "net.pixirn.mediavibration"
   defaultConfig {
+    // ⚠️ expo-module-gradle-plugin REQUIRES versionCode and versionName here.
+    // Without versionName, configuring the project fails outright with
+    // "'android.defaultConfig.versionName' is not defined", taking the whole
+    // app build with it — every Expo module template carries both for this
+    // reason. Keep versionName in step with package.json's version.
+    versionCode 2
+    versionName "0.1.1"
     minSdkVersion 24
   }
 }

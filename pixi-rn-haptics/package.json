@@ -1,8 +1,11 @@
 {
   "name": "@pixi-rn/haptics",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Fail-soft haptics for React Native, with an Android native side that vibrates on the MEDIA usage channel so game feedback survives the system's haptic-feedback level.",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "index.ts",
   "files": [
     "index.ts",
