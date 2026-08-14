@@ -4,6 +4,29 @@ All notable changes to `pixi-rn` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/).
 
+## [0.12.0] - 2026-08-14
+
+### Removed
+
+- **BREAKING: the `pixi-rn/haptics` entry point is gone.** Haptics are their own
+  package now — `npm install @pixi-rn/haptics` and change the import; the cue
+  API is unchanged, so that is the whole migration.
+
+  Splitting the JS from its native half was a mistake worth naming. It put the
+  cue API in `pixi-rn` and the media-channel vibrator in a companion package, so
+  "haptics" was two installs, two names one `@` apart, and a runtime lookup
+  binding them. Every part of that was explicable and the sum of it was
+  confusing. One package that owns both is simpler than any amount of
+  documentation about which half is which.
+
+  The cost is real and worth stating: because autolinking is install-level,
+  anyone who wants haptics at all now takes native code, and with it a
+  development or EAS build instead of Expo Go. `pixi-rn` itself stays Expo Go
+  friendly, which is why the package boundary is where it is.
+
+- `expo-haptics` is no longer a peer dependency of `pixi-rn`; it moved to
+  `@pixi-rn/haptics` with the code that imports it.
+
 ## [0.11.1] - 2026-08-14
 
 ### Fixed

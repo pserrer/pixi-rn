@@ -11,7 +11,7 @@ name: Publish to npm
 # its npmjs.com settings page, pointing at this repo + THIS FILENAME. Keeping
 # every package in one matrix inside one file is what lets them share that
 # configuration shape — renaming this file breaks both.
-# ⚠️ A SCOPED package (@pixi-rn/media-vibration) defaults to private on npm, so its
+# ⚠️ A SCOPED package (@pixi-rn/haptics) defaults to private on npm, so its
 # first manual publish needs --access public.
 on:
   push:
@@ -35,8 +35,8 @@ jobs:
         include:
           - dir: pixi-rn
             name: pixi-rn
-          - dir: pixi-rn-media-vibration
-            name: '@pixi-rn/media-vibration'
+          - dir: pixi-rn-haptics
+            name: '@pixi-rn/haptics'
     defaults:
       run:
         working-directory: ${{ matrix.dir }}

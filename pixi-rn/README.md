@@ -68,8 +68,10 @@ npm install pixi-rn pixi.js expo-gl expo-asset
 One folder per concern, each with a barrel `index.ts`. Everything below is
 re-exported from the package root, so `import { ... } from 'pixi-rn'` covers
 all of it — except the modules that touch a NATIVE capability. Those live
-behind their own entry points (`pixi-rn/audio`, `pixi-rn/haptics`), so a
-consumer only takes on a native dependency for a feature they actually use:
+behind their own entry point (`pixi-rn/audio`), so a consumer only takes on a
+native dependency for a feature they actually use. Haptics went further and
+live in their own package, `@pixi-rn/haptics` — autolinking is install-level,
+so native code cannot be made optional by an entry point:
 
 ```
 src/
@@ -84,10 +86,6 @@ src/
             multi-layer screen root) and color's outline-colour helpers
   perf/     Pool, a retained-scene-graph node pool
   animation/  Tween and Shake (both dtMs-driven), easing curves, lerp
-  haptics/  fail-soft vibration feedback — NOT in the root barrel; import
-            from 'pixi-rn/haptics' (needs `npx expo install expo-haptics`;
-            installing @pixi-rn/media-vibration upgrades Android to the media
-            vibration channel, no import and no call-site change)
   audio/    pooled expo-audio playback — NOT in the root barrel; import
             from 'pixi-rn/audio' (needs `npx expo install expo-audio`)
 testing/    an EXGL-faithful mock GL context for offline smoke tests
@@ -362,9 +360,9 @@ this file is catchable with it, in seconds, instead of an EAS build.
 
 The full API reference is generated with [TypeDoc](https://typedoc.org) from
 the doc comments on every exported symbol — one entry point per published
-subpath (`typedoc.json`'s `entryPoints`), so `pixi-rn/audio` and
-`pixi-rn/haptics` are covered alongside the root barrel. **A new subpath needs
-its entry point added there**, or it silently disappears from the reference.
+subpath (`typedoc.json`'s `entryPoints`), so `pixi-rn/audio` is covered
+alongside the root barrel. **A new subpath needs its entry point added there**,
+or it silently disappears from the reference.
 
 ```sh
 npm run docs                    # from packages/pixi-rn

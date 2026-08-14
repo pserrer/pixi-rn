@@ -1,13 +1,9 @@
-// The native half of `pixi-rn/haptics`.
+// The Android native side: a vibrator on the MEDIA usage channel.
 //
-// You do not normally import this. Installing the package is the whole API:
-// `pixi-rn/haptics` looks the native module up by NAME at runtime — never by
-// importing this package — so its cues automatically upgrade to the media
-// channel wherever this is installed, and keep working (on the portable JS
-// path) wherever it isn't.
-//
-// The direct handle is exported for diagnostics and for callers who want the
-// vibrator without pixi-rn's cue vocabulary.
+// Most callers want the cue API this package exports instead — it prefers this
+// when available and falls back to the portable path when it is not. The handle
+// is exported for diagnostics, and for callers who want raw control over
+// duration and amplitude without the cue vocabulary.
 import { requireOptionalNativeModule } from 'expo';
 
 export interface PixiRnMediaVibrationModule {

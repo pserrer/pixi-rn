@@ -1,26 +1,42 @@
 ---
 title: Haptics
-description: Fail-soft vibration feedback, behind its own entry point.
+description: Fail-soft vibration feedback, in its own package, on Android's media channel.
 ---
 
-Haptics are an enhancement, never a dependency. A device with no vibrator, a
-simulator, or a user who has turned system haptics off must all behave as if the
-calls simply did nothing — so every function here swallows its own failures. No
-call site needs a `try`/`catch`, and none of them returns a promise you have to
-handle.
+Haptics live in a **separate package**, `@pixi-rn/haptics`. It does not depend on
+`pixi-rn` and `pixi-rn` does not depend on it — install it if you want haptics,
+skip it and nothing about the renderer changes.
+
+```sh
+npm install @pixi-rn/haptics
+npx expo install expo-haptics
+```
 
 ```tsx
-import { impactAsync } from 'pixi-rn/haptics';
+import { impactAsync } from '@pixi-rn/haptics';
 
 // `enabled` is the user's own setting — pass it through on every call rather
 // than caching it, so a settings toggle takes effect immediately.
 impactAsync(settings.vibration, 'heavy');
 ```
 
+Haptics are an enhancement, never a dependency. A device with no vibrator, a
+simulator, or a user who has turned system haptics off must all behave as if the
+calls simply did nothing — so every function swallows its own failures. No call
+site needs a `try`/`catch`, and none of them returns a promise you have to
+handle.
+
+<Callout type="warn" title="It is native code">
+  Autolinking is **install-level**: installing this package compiles its Android native side into your build whether or
+  not you import it. So it needs a development or EAS build, it cannot run in Expo Go, and it cannot reach a device over
+  OTA. That is exactly why it is not part of `pixi-rn` — no import boundary can contain a native dependency, only a
+  package boundary can, so `pixi-rn` stays Expo Go friendly for everyone who doesn't want this.
+</Callout>
+
 ## The three cues
 
 ```tsx
-import { impactAsync, selectionAsync, notificationAsync } from 'pixi-rn/haptics';
+import { impactAsync, selectionAsync, notificationAsync } from '@pixi-rn/haptics';
 
 impactAsync(enabled, 'medium'); // a collision, a landing, a snap into place
 selectionAsync(enabled); // a picker stepping, a slider passing a detent
@@ -41,10 +57,11 @@ event handling, where awaiting a native round-trip would sit between the
 simulation step and the render; and a rejection (no vibrator, permission
 withheld) must never surface as an unhandled promise rejection.
 
-## Android drives the vibrator directly
+## Why this package exists at all
 
 There are three ways to make an Android phone buzz from JS, and **all three are
-silenced by the same system setting**:
+silenced by the same system setting** — the _haptic feedback_ level, which is a
+setting about UI touches:
 
 | approach                                                   | amplitude          | suppressed by the haptic-feedback level |
 | ---------------------------------------------------------- | ------------------ | --------------------------------------- |
@@ -52,78 +69,61 @@ silenced by the same system setting**:
 | `performAndroidHapticsAsync` (the haptic engine)           | the platform's own | **yes** (gated outright)                |
 | `Vibration.vibrate` (React Native core)                    | full               | **yes** (no usage attributes)           |
 
-The engine feels best, and it is what this module used in `0.8.0`. It has a
-trapdoor: when the system's haptic-feedback level is **0**, it does nothing —
-and says nothing. `View.performHapticFeedback` returns a boolean reporting
-whether it performed, `expo-haptics` discards that boolean, so the call resolves
+Verified on a device with that level at 0: all three are inaudible, and **none
+of them reports anything wrong**. `View.performHapticFeedback` returns a boolean
+saying whether it performed and `expo-haptics` discards it, so the call resolves
 successfully having produced no vibration at all. Nothing observable from inside
-the app distinguishes that from a device with no vibrator.
+the app distinguishes that from a device with no vibrator — which is what makes
+this expensive to debug rather than merely annoying.
 
-So on Android this module calls `Vibration.vibrate` with per-cue durations: of
-the three it is the strongest when haptics are enabled, running the motor at
-full amplitude rather than a quarter of it. iOS keeps `expo-haptics`, where the
-impact generators are the right thing and have no equivalent trapdoor.
-
-<Callout type="warn" title="None of these escapes the system setting">
-  All three are silenced when the system's haptic-feedback level is 0 — verified on a device, where every one of them is
-  inaudible and none reports anything wrong. This module picks `Vibration.vibrate` because it is the strongest of the
-  three when haptics *are* enabled, not because it bypasses anything. An earlier version of this page claimed it did;
-  that was wrong.
-
-Bypassing the setting needs **native code**, which cannot ship inside this package: autolinking is install-level, so it
-would be compiled into every consumer's build whether or not they imported it, costing everyone their Expo Go
-workflow. It lives in an optional companion package instead — see below — so that overriding a user's stated OS
-preference stays an explicit decision by an app that has its own vibration toggle.
-
-</Callout>
-
-## If you need it regardless of the system setting
-
-Install the companion package:
-
-```sh
-npm install @pixi-rn/media-vibration
-```
-
-That is the entire integration. Every cue above then vibrates on Android's
-**media** channel, which the haptic-feedback level does not touch — no import,
-no registration, no change at any call site. **Verified on a device with haptic
-feedback set to 0: cues buzz, where all three JS paths are silent.**
-
-It works by native-module _name_ lookup at runtime, so this package takes no
-dependency on it: with the companion absent, the same calls fall back to the
-portable path and follow the system setting as before.
-
-<Callout type="warn" title="Why a package and not a subpath">
-  Autolinking is **install-level**. Native code inside `pixi-rn` would be compiled into every consumer's build whether
-  or not they imported it, costing everyone their Expo Go workflow — no import boundary can prevent that, but a package
-  boundary can. It also means installing the companion requires a development or EAS build, and it cannot reach a device
-  over OTA.
-</Callout>
+A game's collision cue is not UI touch feedback, and Android agrees: its
+settings screen carries an independent media-vibration level. This package's
+native side attaches `AudioAttributes.USAGE_MEDIA` and lands there instead.
+**Verified on a device with haptic feedback set to 0: cues buzz, where all three
+JS paths are silent.**
 
 <Callout type="warn">
-  Installing it lets your app vibrate while the user has touch feedback switched off. Only do it if you give the player
-  their own vibration toggle — every function here takes that flag as its first argument, and you must pass it honestly.
+  This lets your app vibrate while the user has touch feedback switched off. Only ship it if you give the player their
+  own vibration toggle — every function takes that flag as its first argument, and you must pass it honestly.
 </Callout>
 
-## Installation
+## What runs where
 
-Haptics live behind their own entry point, `pixi-rn/haptics` — the same rule
-[`audio`](/docs/concepts/audio) follows, so a native capability never rides
-along in the root barrel for consumers who don't use it. Install `expo-haptics`
-alongside it:
+`impactAsync` and friends pick a backend at runtime, so one call site covers
+every platform:
 
-```sh
-npx expo install expo-haptics
+| where                             | what runs                           | follows the system setting   |
+| --------------------------------- | ----------------------------------- | ---------------------------- |
+| Android, native side compiled in  | the media channel                   | no                           |
+| Android, Expo Go / offline export | `Vibration.vibrate`, full amplitude | yes                          |
+| iOS                               | `expo-haptics` impact generators    | n/a — no equivalent trapdoor |
+
+The native module is resolved with `requireOptionalNativeModule`, so the
+fallbacks are automatic rather than something you configure.
+
+## The raw vibrator
+
+For direct control over duration and amplitude, the native handle is exported
+too:
+
+```tsx
+import { PixiRnMediaVibration } from '@pixi-rn/haptics';
+
+PixiRnMediaVibration?.vibrate(45, 255); // 45ms at full amplitude (1..255)
+PixiRnMediaVibration?.vibratePattern([0, 25, 90, 25]); // [wait, buzz, …] ms
 ```
 
-It is a native module, so adding it needs a fresh native build; an OTA update
-onto a binary without it will not gain haptics.
+⚠️ It is **`null`** on iOS, in Expo Go, and in any build without the native side
+— hence the `?.`. This is easy to miss, because it is never null on the platform
+you develop the feature on.
 
-<Callout title="Why there is no setup call">
-  Earlier versions had the host inject `expo-haptics` with a `setHapticsModule` call, so that naming the package here
-  couldn't force it on every consumer — a bundler resolves imports statically, so an import in the root barrel is an
-  import for everybody. Moving the module behind its own entry point solves that directly and better: the dependency now
-  follows the feature. Injection was left buying only stubbability, while charging a real price — a host that forgot the
-  registration call got silence, with nothing failing to say so. A plain import has no step to forget.
-</Callout>
+## Diagnostics
+
+`hapticsDiagnostics()` reports the platform, which backend is in use, how many
+cues have been requested, and the last error — useful when haptics "don't work"
+and you need to separate "the app never asked" from "the app asked and something
+threw".
+
+⚠️ Its `lastError: null` means **nothing threw**. It does not mean the device
+buzzed; no platform reports that back. Confusing the two is what turns a
+device-settings problem into five rounds of debugging your own code.

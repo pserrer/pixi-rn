@@ -1,5 +1,6 @@
 import { Platform, Vibration } from 'react-native';
 import { requireOptionalNativeModule } from 'expo';
+import type { PixiRnMediaVibrationModule } from './native';
 import * as Haptics from 'expo-haptics';
 
 /**
@@ -32,28 +33,28 @@ import * as Haptics from 'expo-haptics';
  * This module uses (3) on Android — the strongest of the three — and
  * `expo-haptics` on iOS, where the impact generators are the right thing.
  *
+ *
+ * ## The media channel
+ *
  * ⚠️ **None of the three escapes the system's haptic-feedback level.** RN passes
  * no `VibrationAttributes`, so the platform treats the effect as USAGE_UNKNOWN
  * and scales it by the touch-feedback intensity — at 0, to silence. Verified on
  * a device: with that level at 0, all three are inaudible and none reports
  * anything wrong.
  *
- * ## `@pixi-rn/media-vibration`, when the setting must not win
- *
- * Installing that companion package upgrades every cue here to Android's MEDIA
- * vibration channel, which the haptic-feedback level does not touch. It is
- * discovered by NATIVE MODULE NAME at runtime and never imported, which is what
- * keeps it optional: this package has no dependency on it, and a consumer who
- * doesn't install it keeps their Expo Go workflow. Autolinking is install-level,
- * so a separate package is the only boundary that actually holds — an import
- * boundary would not.
+ * So on Android this package prefers its OWN native module, which attaches
+ * `AudioAttributes.USAGE_MEDIA` and lands on the separate media-vibration
+ * channel that setting does not touch. It is resolved with
+ * `requireOptionalNativeModule`, so the cues degrade to the portable path
+ * wherever the native side isn't compiled in — iOS, Expo Go, an offline export
+ * — rather than throwing.
  *
  * Every function takes the user's own on/off setting as its first argument, and
  * every caller must honour it — a host without such a toggle should add one.
  *
  * @example
  * ```ts
- * import { impactAsync } from 'pixi-rn/haptics';
+ * import { impactAsync } from '@pixi-rn/haptics';
  *
  * // `enabled` is the user's own setting — pass it through on every call rather
  * // than caching it, so a settings toggle takes effect immediately.
@@ -80,13 +81,10 @@ const NOTIFICATION_TYPES = {
 
 const ANDROID = Platform.OS === 'android';
 
-// The optional companion. Looked up by NAME — importing `@pixi-rn/media-vibration`
-// would make it a hard dependency, which is exactly what must not happen.
-interface MediaVibrator {
-  vibrate(durationMs: number, amplitude: number): void;
-  vibratePattern(pattern: number[]): void;
-}
-const media = ANDROID ? requireOptionalNativeModule<MediaVibrator>('PixiRnMediaVibration') : null;
+// This package's own native side. Optional even here: it is Android-only, and
+// absent in Expo Go and in an offline export, where the cues fall back to the
+// portable path instead of failing.
+const media = ANDROID ? requireOptionalNativeModule<PixiRnMediaVibrationModule>('PixiRnMediaVibration') : null;
 
 // Durations in ms. `Vibration.vibrate(ms)` runs the motor at full amplitude for
 // that long, so these are shorter than the equivalent expo-haptics waveforms —
@@ -111,10 +109,10 @@ const ANDROID_NOTIFICATION_MS = {
 export interface HapticsDiagnostics {
   /** `Platform.OS`. */
   platform: string;
-  /** Which implementation is in use. `media` means `@pixi-rn/media-vibration` is
-   *  installed and cues are on Android's media channel, immune to the system
-   *  haptic-feedback level; `vibrator` is the portable Android path, which is
-   *  not. */
+  /** Which implementation is in use. `media` means this package's native side
+   *  is compiled in and cues are on Android's media channel, immune to the
+   *  system haptic-feedback level; `vibrator` is the portable Android path,
+   *  which is not. */
   path: 'media' | 'vibrator' | 'expo-haptics';
   /** Cues requested since launch. */
   calls: number;

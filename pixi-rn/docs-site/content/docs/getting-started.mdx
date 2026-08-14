@@ -45,6 +45,15 @@ bun add pixi-rn pixi.js expo-gl expo-asset
 pin their versions for you, since your app already does. See the package on
 [npm](https://www.npmjs.com/package/pixi-rn) for the full version history.
 
+`expo-audio` is a peer too, but an **optional** one: it backs
+[`pixi-rn/audio`](/docs/concepts/audio), which sits behind its own entry point so
+that a native dependency follows the feature rather than everyone who installs
+the library. Nothing installs it for you — if you import that entry point, run
+`npx expo install expo-audio` yourself.
+
+[Haptics](/docs/concepts/haptics) are not part of `pixi-rn` at all; they are
+their own package, `@pixi-rn/haptics`.
+
 ## A minimal screen
 
 Everything below lives inside `GLView`'s `onContextCreate` — the one place

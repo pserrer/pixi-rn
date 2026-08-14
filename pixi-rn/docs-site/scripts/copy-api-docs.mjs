@@ -86,7 +86,7 @@ const titleCase = (s) => s.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperC
 // the source path (`src/index.ts` → `index`). Title them by the import path a
 // reader would actually write instead — that, not the file layout, is what
 // tells them where a symbol comes from.
-const MODULE_TITLES = { index: 'pixi-rn', audio: 'pixi-rn/audio', haptics: 'pixi-rn/haptics' };
+const MODULE_TITLES = { index: 'pixi-rn', audio: 'pixi-rn/audio' };
 for (const entry of readdirSync(DEST)) {
   const full = path.join(DEST, entry);
   if (!statSync(full).isDirectory()) continue;

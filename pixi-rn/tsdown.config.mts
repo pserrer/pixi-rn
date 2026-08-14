@@ -11,7 +11,6 @@ export default defineConfig({
   entry: {
     index: 'src/index.ts',
     audio: 'src/audio/index.ts',
-    haptics: 'src/haptics/index.ts',
   },
   format: ['cjs', 'esm'],
   dts: true,

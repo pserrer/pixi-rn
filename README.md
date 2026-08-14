@@ -2,14 +2,14 @@
 
 [pixi.js](https://pixijs.com) v8 inside React Native, on `expo-gl`.
 
-| package                                                 | what it is                                                                                                                |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| [`pixi-rn`](./pixi-rn)                                  | the library: renderer bring-up, frame loop, flex layout, bitmap text, input, UI kit, pooling, animation, audio, haptics   |
-| [`@pixi-rn/media-vibration`](./pixi-rn-media-vibration) | optional Android companion — vibration on the media channel, so game feedback survives the system's haptic-feedback level |
+| package                                 | what it is                                                                                                                                                       |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`pixi-rn`](./pixi-rn)                  | the library: renderer bring-up, frame loop, flex layout, bitmap text, input, UI kit, pooling, animation, audio                                                   |
+| [`@pixi-rn/haptics`](./pixi-rn-haptics) | standalone haptics — cross-platform cues, and an Android native side on the media vibration channel so game feedback survives the system's haptic-feedback level |
 
-Start with [`pixi-rn`](./pixi-rn). The companion is opt-in: install it only if
-you need haptics that ignore that system setting, and note that it is native
-code, so it costs you Expo Go.
+Start with [`pixi-rn`](./pixi-rn). Haptics are a separate, independent package:
+neither depends on the other, so take it only if you want it — and note that it
+is native code, so it costs you Expo Go.
 
 **Documentation:** https://pserrer.github.io/pixi-rn/
 

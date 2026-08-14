@@ -52,19 +52,17 @@ export {
 // without reallocating once it reaches a steady-state size.
 export { Pool } from './perf/pool';
 
-// NOTE: the NATIVE-CAPABILITY modules are deliberately NOT re-exported here.
-// `audio` and `haptics` each live behind their own entry point — import them
-// from `pixi-rn/audio` and `pixi-rn/haptics` — so a consumer only takes on a
+// NOTE: `audio` is deliberately NOT re-exported here. It lives behind its own
+// entry point — import it from `pixi-rn/audio` — so a consumer only takes on a
 // native dependency for a feature they actually use.
 //
-// For `audio` this is load-bearing: it imports `expo-audio` at module scope,
-// and a bundler resolves imports statically, so re-exporting it here would
-// force every consumer to install that package merely to bundle anything at
-// all. It is also what lets the offline harnesses (`glsmoke`/`perf`) import
-// this barrel with no native stubs. `haptics` reaches its native module only
-// through an injected implementation, so it could technically sit here — it
-// doesn't, because one rule ("a native capability lives behind a subpath") is
-// worth more than the one import it would save.
+// This is load-bearing: it imports `expo-audio` at module scope, and a bundler
+// resolves imports statically, so re-exporting it here would force every
+// consumer to install that package merely to bundle anything at all. It is also
+// what lets the offline harnesses (`glsmoke`/`perf`) import this barrel with no
+// native stubs. Haptics went one step further and left the package entirely —
+// its native side has to be autolinked, which is install-level, so no entry
+// point inside `pixi-rn` could have kept it off a consumer's build.
 
 // dtMs-driven animation drivers plus the easing/lerp math they're built on —
 // nothing here owns a timer or ticker of its own.
