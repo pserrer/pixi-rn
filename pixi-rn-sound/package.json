@@ -1,0 +1,37 @@
+{
+  "name": "@pixi-rn/sound",
+  "version": "0.1.0",
+  "description": "@pixi/sound on React Native, backed by react-native-audio-api \u2014 the real Web Audio graph, filters and all.",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "index.ts",
+  "files": [
+    "index.ts",
+    "shim.ts",
+    "load.ts",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "react-native",
+    "expo",
+    "pixi",
+    "pixijs",
+    "sound",
+    "audio",
+    "web-audio"
+  ],
+  "peerDependencies": {
+    "@pixi/sound": "^6.0.0",
+    "pixi.js": "^8.0.0",
+    "react-native": "*",
+    "react-native-audio-api": ">=0.13.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pserrer/pixi-rn.git",
+    "directory": "pixi-rn-sound"
+  }
+}

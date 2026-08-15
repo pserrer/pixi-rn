@@ -37,6 +37,8 @@ jobs:
             name: pixi-rn
           - dir: pixi-rn-haptics
             name: '@pixi-rn/haptics'
+          - dir: pixi-rn-sound
+            name: '@pixi-rn/sound'
     defaults:
       run:
         working-directory: ${{ matrix.dir }}

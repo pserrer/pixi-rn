@@ -6,6 +6,7 @@
 | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`pixi-rn`](./pixi-rn)                  | the library: renderer bring-up, frame loop, flex layout, bitmap text, input, UI kit, pooling, animation, audio                                                   |
 | [`@pixi-rn/haptics`](./pixi-rn-haptics) | standalone haptics — cross-platform cues, and an Android native side on the media vibration channel so game feedback survives the system's haptic-feedback level |
+| [`@pixi-rn/sound`](./pixi-rn-sound)     | `@pixi/sound` backed by react-native-audio-api — the real Web Audio graph, filters and all                                                                       |
 
 Start with [`pixi-rn`](./pixi-rn). Haptics are a separate, independent package:
 neither depends on the other, so take it only if you want it — and note that it
