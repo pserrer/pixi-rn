@@ -69,6 +69,16 @@ logs:
   package `require()`s it lazily for that reason — one place, so no consumer has
   to.
 
+## Backgrounding
+
+`initAudio()` binds `AppState` so audio stops when the app leaves the
+foreground and resumes on return.
+
+`@pixi/sound`'s own `autoPause` cannot do this on React Native: it listens for
+`globalThis` `focus`/`blur`, which never fire here. This is the same shape of
+problem as its autoplay-unlock path — a browser assumption that is silently
+inert on Hermes.
+
 ## What is shimmed
 
 | global                                | backed by                                      |

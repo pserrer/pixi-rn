@@ -4,6 +4,19 @@ All notable changes to `@pixi-rn/sound` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/).
 
+## [0.2.2] - 2026-08-15
+
+### Fixed
+
+- **Audio kept playing after the app was backgrounded.** `@pixi/sound` has
+  `autoPause` for this, on by default, but implements it with
+  `globalThis.addEventListener('focus'|'blur')` — events that never fire in
+  React Native, so its background handling was dead code here. `initAudio()`
+  now binds React Native's `AppState` to `context.paused`, which suspends the
+  whole `AudioContext` rather than only pausing instances. Anything that is
+  not `active` counts as backgrounded, so iOS's transient `inactive` (the app
+  switcher, a notification shade) goes quiet too.
+
 ## [0.2.1] - 2026-08-15
 
 ### Fixed

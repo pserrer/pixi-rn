@@ -1,8 +1,41 @@
+import { AppState, type AppStateStatus, type NativeEventSubscription } from 'react-native';
 import { sound } from '@pixi/sound';
 import { installWebAudioGlobals, nativeAudio, nativeAudioError } from './shim';
 
 let lastError: string | null = null;
 let ready = false;
+let appStateSub: NativeEventSubscription | null = null;
+
+/**
+ * Stop audio while the app is backgrounded, and pick it up again on return.
+ *
+ * ⚠️ `@pixi/sound` has this — `autoPause`, on by default — but it implements it
+ * with `globalThis.addEventListener('focus'|'blur')`, which NEVER FIRES in
+ * React Native. So its background handling is dead code here, and music plays
+ * on over the home screen unless something else stops it. `AppState` is the
+ * platform's version of the same signal.
+ *
+ * Driving `context.paused` rather than `pauseAll()` is deliberate: the setter
+ * suspends the whole `AudioContext`, so nothing keeps rendering while
+ * backgrounded, and `refreshPaused()` propagates it to live instances.
+ *
+ * iOS reports `inactive` for transient interruptions (the app switcher, a
+ * notification shade). A game should go quiet for those too, so anything that
+ * is not `active` counts as backgrounded.
+ */
+function bindAppState(): void {
+  if (appStateSub) return;
+  const ctx = sound.context as unknown as { paused: boolean; refreshPaused?: () => void };
+  const apply = (state: AppStateStatus) => {
+    try {
+      ctx.paused = state !== 'active';
+      ctx.refreshPaused?.();
+    } catch {
+      // Backgrounding must never be able to throw into the host.
+    }
+  };
+  appStateSub = AppState.addEventListener('change', apply);
+}
 
 /**
  * Bring the audio engine up. **Call this from an effect, never at module
@@ -60,6 +93,8 @@ export function initAudio(): boolean {
     // makes the FIRST play cost the same as every later one.
     const ctx = sound.context as unknown as { playEmptySound?: () => void };
     ctx.playEmptySound?.();
+
+    bindAppState();
 
     ready = true;
     return true;
