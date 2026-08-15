@@ -1,12 +1,12 @@
 {
   "name": "@pixi-rn/haptics",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Fail-soft haptics for React Native, with an Android native side that vibrates on the MEDIA usage channel so game feedback survives the system's haptic-feedback level.",
   "license": "MIT",
   "publishConfig": {
     "access": "public"
   },
-  "main": "index.ts",
+  "main": "src/index.ts",
   "scripts": {
     "docs": "typedoc"
   },
@@ -17,9 +17,7 @@
     "typescript": "^5.8.0"
   },
   "files": [
-    "index.ts",
-    "haptics.ts",
-    "native.ts",
+    "src",
     "expo-module.config.json",
     "android",
     "README.md",

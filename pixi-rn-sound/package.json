@@ -1,12 +1,12 @@
 {
   "name": "@pixi-rn/sound",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "@pixi/sound on React Native, backed by react-native-audio-api \u2014 the real Web Audio graph, filters and all.",
   "license": "MIT",
   "publishConfig": {
     "access": "public"
   },
-  "main": "index.ts",
+  "main": "src/index.ts",
   "scripts": {
     "docs": "typedoc"
   },
@@ -17,13 +17,7 @@
     "typescript": "^5.8.0"
   },
   "files": [
-    "index.ts",
-    "shim.ts",
-    "load.ts",
-    "init.ts",
-    "throttle.ts",
-    "tracks.ts",
-    "filterGroup.ts",
+    "src",
     "README.md",
     "CHANGELOG.md"
   ],

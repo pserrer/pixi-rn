@@ -1,0 +1,15 @@
+{
+  "name": "pixi-rn-monorepo",
+  "private": true,
+  "description": "pixi.js v8 inside React Native, on expo-gl — pixi-rn plus its standalone companion packages.",
+  "workspaces": [
+    "pixi-rn",
+    "pixi-rn-haptics",
+    "pixi-rn-sound"
+  ],
+  "scripts": {
+    "docs": "npm run docs --workspaces --if-present",
+    "docs:site": "npm install --prefix pixi-rn/docs-site && npm run build --prefix pixi-rn/docs-site",
+    "docs:site:dev": "npm install --prefix pixi-rn/docs-site && npm run dev --prefix pixi-rn/docs-site"
+  }
+}

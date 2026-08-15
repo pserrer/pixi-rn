@@ -4,6 +4,15 @@ All notable changes to `@pixi-rn/sound` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] - 2026-08-15
+
+### Changed
+
+- Source moved under `src/` (`main` is now `src/index.ts`), matching
+  `pixi-rn`'s own layout. A deep import of a specific file
+  (`@pixi-rn/sound/shim` and similar) needs the `src/` prefix now; importing
+  the package itself (`@pixi-rn/sound`) is unaffected.
+
 ## [0.3.0] - 2026-08-15
 
 ### Added

@@ -30,13 +30,12 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install pixi-rn deps
+      # Installs all three workspace members (pixi-rn, pixi-rn-haptics,
+      # pixi-rn-sound) — docs-site's own prebuild (copy-api-docs.mjs)
+      # regenerates each package's TypeDoc output itself via `npm run docs
+      # --workspace <name>`, which needs this root install to resolve.
+      - name: Install workspace deps
         run: npm install
-        working-directory: pixi-rn
-
-      - name: Build API reference (TypeDoc)
-        run: npm run docs
-        working-directory: pixi-rn
 
       - name: Install docs-site deps
         run: npm ci
