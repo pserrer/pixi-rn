@@ -30,3 +30,45 @@ export async function addSound(alias: string, source: SoundSource, options?: Opt
   if (!buffer) throw new Error(`@pixi-rn/sound: could not decode "${alias}"`);
   return sound.add(alias, { ...options, source: buffer });
 }
+
+export interface LoadSoundsOptions<K extends string> {
+  /** Passed to every clip's `addSound` call. A function receives the clip's
+   *  key, for a per-clip volume or loop flag. */
+  options?: Options | ((name: K) => Options | undefined);
+  /** Called for a clip that fails to decode. Defaults to ignoring it — the
+   *  clip is simply absent from the returned map. */
+  onError?: (name: K, err: unknown) => void;
+  /** Polled after each clip decodes. Once it returns `true`, the clip just
+   *  finished is destroyed instead of kept, and loading stops — for an
+   *  effect that unmounted while a `loadSounds` call was still in flight. */
+  cancelled?: () => boolean;
+}
+
+/**
+ * Decode a batch of clips one at a time and return whichever ones succeeded.
+ *
+ * Sequential rather than `Promise.all` — decoding is native work, and
+ * spreading several across a frame budget beats contending for it all at
+ * once. A clip that fails to decode is skipped rather than failing the
+ * batch, so one bad asset doesn't take the rest down with it.
+ */
+export async function loadSounds<K extends string>(
+  sources: Record<K, SoundSource>,
+  opts: LoadSoundsOptions<K> = {},
+): Promise<Partial<Record<K, Sound>>> {
+  const result: Partial<Record<K, Sound>> = {};
+  for (const [name, source] of Object.entries(sources) as [K, SoundSource][]) {
+    try {
+      const perClip = typeof opts.options === 'function' ? opts.options(name) : opts.options;
+      const clip = await addSound(name, source, perClip);
+      if (opts.cancelled?.()) {
+        clip.destroy();
+        break;
+      }
+      result[name] = clip;
+    } catch (err) {
+      opts.onError?.(name, err);
+    }
+  }
+  return result;
+}

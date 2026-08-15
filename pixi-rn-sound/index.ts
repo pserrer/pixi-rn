@@ -11,7 +11,10 @@
 import './shim';
 
 export * from '@pixi/sound';
-export { addSound, type SoundSource } from './load';
+export { addSound, loadSounds, type SoundSource, type LoadSoundsOptions } from './load';
 export { initAudio, audioManager, soundDiagnostics } from './init';
 export { installWebAudioGlobals, nativeAudio } from './shim';
+export { throttle } from './throttle';
+export { TrackSwitcher } from './tracks';
+export { FilterGroup } from './filterGroup';
 export { sound as default } from '@pixi/sound';

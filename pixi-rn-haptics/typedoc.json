@@ -1,0 +1,18 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["index.ts"],
+  "tsconfig": "./tsconfig.json",
+  "out": "docs",
+  "name": "@pixi-rn/haptics",
+  "readme": "none",
+  "includeVersion": true,
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "excludeExternals": true,
+  "categorizeByGroup": true,
+  "sort": ["source-order"],
+  "hideBreadcrumbs": true,
+  "hidePageHeader": true,
+  "hideGenerator": true,
+  "plugin": ["typedoc-plugin-markdown", "typedoc-plugin-frontmatter", "../pixi-rn/scripts/typedoc-fumadocs.mjs"]
+}

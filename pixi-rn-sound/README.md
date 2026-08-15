@@ -2,11 +2,9 @@
 
 [`@pixi/sound`](https://pixijs.io/sound/) on React Native, backed by
 [`react-native-audio-api`](https://github.com/software-mansion/react-native-audio-api)
-— the real Web Audio graph: filters, per-instance volume and speed, sprites,
-`decodeAudioData`.
-
-This package is glue, not a reimplementation. It installs the Web Audio globals
-`@pixi/sound` expects, in the right order, and re-exports the library unchanged.
+— a real Web Audio graph: filters, per-instance volume and speed, sprites,
+`decodeAudioData`. Plus a small set of playback helpers on top (throttling,
+music-track switching, toggleable filter chains).
 
 ## Install
 
@@ -15,122 +13,153 @@ npm install @pixi-rn/sound @pixi/sound react-native-audio-api
 ```
 
 ```ts
-import { sound } from '@pixi-rn/sound';
-
-await sound.add('coin', require('./assets/coin.wav'));
-sound.play('coin');
-```
-
-Import from `@pixi-rn/sound`, **never from `@pixi/sound` directly** — see below.
-
-> [!WARNING]
-> `react-native-audio-api` is native code, so this needs a development or EAS
-> build. It cannot run in Expo Go and cannot reach a device over OTA.
-
-## Why the import has to come from here
-
-`@pixi/sound` touches `document` at **module scope** — its format detection
-builds an `<audio>` element to call `canPlayType` on. Import it directly on
-Hermes and it throws `ReferenceError: document is not defined` before any of
-your code runs.
-
-`index.ts` imports the shim first and only then re-exports the library. Within a
-module, ES evaluation order follows source order, so that ordering is guaranteed
-— but only for imports that go through this package. A direct
-`import '@pixi/sound'` anywhere in your graph can still evaluate first and
-throw.
-
-## Bring it up from an effect
-
-Importing this package is **inert** — it installs a few pure-JS DOM stubs and
-touches nothing native. `initAudio()` is what starts the engine, and it belongs
-in an effect:
-
-```ts
 import { sound, addSound, initAudio } from '@pixi-rn/sound';
 
 useEffect(() => {
   initAudio();
   void addSound('coin', require('./assets/coin.wav'));
 }, []);
+
+sound.play('coin');
 ```
 
-That ordering is not a style preference. Two things would otherwise run native
-code during **bundle evaluation** — before React renders, before any error
-boundary exists, where a failure is a silent tear-down with nothing in the JS
-logs:
+Always import from `@pixi-rn/sound` — never `import ... from '@pixi/sound'`
+directly, and don't import `react-native-audio-api` yourself either. This
+package re-exports everything `@pixi/sound` exports.
 
-- `@pixi/sound` builds its `sound` singleton as the last statement of its
-  module, and that constructor builds a real `AudioContext` — but only
-  `if (this.supported)`, which is `window.AudioContext !== null`. Leaving the
-  globals out until `initAudio()` makes that branch skip.
-- Importing `react-native-audio-api` runs `NativeAudioAPIModule.install()` in a
-  module-scope constructor, and **throws** if the native module is absent. This
-  package `require()`s it lazily for that reason — one place, so no consumer has
-  to.
+> [!WARNING]
+> `react-native-audio-api` is native code, so this needs a development or EAS
+> build. It cannot run in Expo Go and cannot reach a device over OTA.
 
-## Backgrounding
+## Bring the engine up
 
-`initAudio()` binds `AppState` so audio stops when the app leaves the
-foreground and resumes on return.
+Call `initAudio()` from an effect — never at module scope or in a render body.
+It's safe to call more than once (a no-op after the first success) and it
+never throws:
 
-`@pixi/sound`'s own `autoPause` cannot do this on React Native: it listens for
-`globalThis` `focus`/`blur`, which never fire here. This is the same shape of
-problem as its autoplay-unlock path — a browser assumption that is silently
-inert on Hermes.
+```ts
+useEffect(() => {
+  if (!initAudio()) {
+    const { lastError } = soundDiagnostics();
+    // fall back to a silent game — audio is an enhancement
+  }
+}, []);
+```
 
-## What is shimmed
+Importing the package by itself does nothing native — that only happens
+inside `initAudio()`.
 
-| global                                | backed by                                      |
-| ------------------------------------- | ---------------------------------------------- |
-| `AudioContext`, `window.AudioContext` | `react-native-audio-api`, plus one patch below |
-| `OfflineAudioContext`                 | a decode-only adapter — see below              |
-| `AudioBuffer`                         | `react-native-audio-api`                       |
-| `HTMLAudioElement`                    | empty class — only an `instanceof` target      |
-| `document.createElement('audio')`     | stub whose `canPlayType` returns `''`          |
+`initAudio()` also:
 
-`canPlayType` reporting nothing is accurate — there is no HTML audio here — and
-it is what keeps `@pixi/sound` on its WebAudio path instead of the legacy one.
+- claims the platform audio session, so the first cue plays without a delay
+- primes the Web Audio graph with a silent buffer
+- binds `AppState` so audio pauses while the app is backgrounded and resumes
+  on return (covers iOS's transient `inactive`, e.g. the app switcher, too)
 
-## Why `OfflineAudioContext` is an adapter
+`soundDiagnostics()` returns `{ ready, lastError }`. `lastError: null` means
+nothing threw — it does **not** mean audio is actually producing sound; no
+platform reports that back.
 
-`WebAudioContext`'s constructor builds one unconditionally — `new
-OfflineAudioContext(1, 2, sampleRate)`, a **two-sample** context — and uses it
-for exactly one thing: `decodeAudioData`.
+## Loading clips
 
-In a browser that costs nothing. Here, `OfflineAudioContext`'s constructor calls
-`AudioAPIModule.createAudioRuntime()` → `createWorkletRuntime('AudioWorkletRuntime')`.
-The live `AudioContext` built one line earlier does the same. So the real class
-means **two Reanimated worklet runtimes under the same name, milliseconds apart,
-during startup** — something a browser never does, and a good way to die without
-a JS exception.
+`require('./clip.wav')`, a URL string, or an `ArrayBuffer` of already-decoded
+bytes are all valid sources.
 
-The stand-in provides the one method actually used, backed by the same native
-decoder `addSound` uses, and creates no second runtime. Anything that genuinely
-needs offline _rendering_ should construct a real one deliberately, after
-startup.
+```ts
+const coin = await addSound('coin', require('./assets/coin.wav'), { volume: 0.8 });
+coin.play();
+```
 
-## The one real gap: no dynamics compressor
+`loadSounds` decodes a batch, one at a time, and returns whichever succeeded
+— a clip that fails to decode is skipped rather than failing the whole batch:
 
-`react-native-audio-api` implements no `DynamicsCompressorNode`, and
-`@pixi/sound`'s `WebAudioContext` constructor calls `createDynamicsCompressor()`
-unconditionally — so without a stand-in, constructing the context throws and
-nothing plays at all.
+```ts
+const clips = await loadSounds(
+  { jump: require('./jump.wav'), coin: require('./coin.wav') },
+  {
+    options: (name) => ({ volume: name === 'coin' ? 0.6 : 0.85, preload: true }),
+    onError: (name, err) => console.warn(`sound "${name}" failed`, err),
+    cancelled: () => unmounted, // stop and destroy the in-flight clip
+  },
+);
+clips.jump?.play();
+```
 
-This package substitutes a **unity-gain `GainNode`**: it connects and
-disconnects like the real node and leaves the signal untouched. The practical
-consequence is **no master limiting**. For game SFX mixed at sane levels that is
-the right trade; if you drive many loud sources at once you may clip where a
-browser would not. `sound.context.compressor` is that gain node, so reading
-compressor-specific params (`threshold`, `knee`, `ratio`) gets you `undefined`
-rather than a number.
+Every buffer is uncompressed float32 PCM in memory —
+`seconds × sampleRate × channels × 4` bytes. Fine for short effects; a
+minutes-long track costs tens of MB, so measure before loading one.
+
+## Playback helpers
+
+### `throttle` — rate-limit a bursty cue
+
+```ts
+const playCoin = throttle(() => coin.play(), 90);
+for (const c of collectedThisFrame) playCoin(); // at most one play every 90ms
+```
+
+### `TrackSwitcher` — swap between looping tracks
+
+For background music or ambience beds: switching pauses the track that's no
+longer current instead of destroying it, so resuming picks up where it left
+off.
+
+```ts
+const music = new TrackSwitcher<'menu' | 'level'>();
+music.add('menu', menuTrack);
+music.add('level', levelTrack);
+
+music.play(inMenu ? 'menu' : 'level');
+music.play(muted ? null : inMenu ? 'menu' : 'level'); // null = silence
+music.setVolume(settings.musicVolume);
+```
+
+Every method is safe to call redundantly — `play`/`setVolume` only touch the
+audio graph on an actual change. `add()` can register a track that finishes
+loading after `play()` already asked for it; it starts immediately once
+added. `TrackSwitcher` doesn't own its `Sound` objects — destroy them
+yourself when you're done with them.
+
+### `FilterGroup` — toggle a filter chain across a set of clips
+
+```ts
+const caveEcho = new FilterGroup(() => [new filters.ReverbFilter(1.6, 2.5)]);
+caveEcho.add(jumpClip);
+caveEcho.add(footstepLoop);
+
+caveEcho.set(inCave); // on/off; a no-op if the state didn't change
+```
+
+`buildFilters` runs once, the first time the chain turns on, and the result
+is reused — build a filter like `ReverbFilter` more than once per toggle and
+you pay its setup cost (its impulse response is generated in a JS loop) every
+time. A clip added while the chain is on picks it up immediately.
+
+## Filters
+
+`filters` is `@pixi/sound`'s own export, re-exported unchanged —
+`ReverbFilter`, `EqualizerFilter`, `DistortionFilter`, `StereoFilter`,
+`TelephoneFilter`, `MonoFilter`. Apply per clip (`clip.filters = [...]`)
+rather than through `sound.filtersAll`, which is context-wide and reaches
+every other sound too, including music.
+
+## Known gaps
+
+- **No `DynamicsCompressorNode`.** `sound.context.compressor` is a unity-gain
+  passthrough, not a real compressor — reading `threshold`/`knee`/`ratio` off
+  it gets you `undefined`. There is no master limiting: many loud
+  simultaneous sources can clip where a browser wouldn't.
+- **`OfflineAudioContext` only implements `decodeAudioData`.** If you need
+  real offline rendering (`startRendering`), construct
+  `react-native-audio-api`'s own `OfflineAudioContext` directly.
+- **`document.createElement('audio').canPlayType()` always returns `''`.**
+  There's no HTML `<audio>` here; this is what keeps `@pixi/sound` on its
+  WebAudio code path.
 
 ## Relationship to `pixi-rn/audio`
 
-[`pixi-rn`](https://www.npmjs.com/package/pixi-rn) ships a much smaller audio
-module of its own, built on `expo-audio`: pooled one-shot players and a looping
-player, tuned to keep native calls off the frame path. They solve different
-problems.
+[`pixi-rn`](https://www.npmjs.com/package/pixi-rn) ships a smaller audio
+module of its own, built on `expo-audio`.
 
 |                                      | `pixi-rn/audio` | `@pixi-rn/sound`         |
 | ------------------------------------ | --------------- | ------------------------ |
@@ -139,8 +168,9 @@ problems.
 | filters, sprites, per-instance pitch | no              | yes                      |
 | Expo Go                              | yes             | no                       |
 
-Reach for this one when you want the audio graph. Reach for `pixi-rn/audio` when
-you want a handful of clips to fire cheaply.
+Reach for `@pixi-rn/sound` when you want the audio graph. Reach for
+`pixi-rn/audio` when you want a handful of clips to fire cheaply and Expo Go
+support matters.
 
 ## Licence
 

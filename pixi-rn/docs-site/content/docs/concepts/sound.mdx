@@ -1,0 +1,135 @@
+---
+title: Sound
+description: A real Web Audio graph on React Native — filters, sprites, per-instance pitch — plus music switching and throttling helpers.
+---
+
+Sound lives in a **separate package**, `@pixi-rn/sound`. It does not depend on
+`pixi-rn` and `pixi-rn` does not depend on it — install it if you want the full
+Web Audio graph, skip it and use [`pixi-rn/audio`](/docs/concepts/audio)
+instead if you just want a handful of clips to fire cheaply.
+
+```sh
+npm install @pixi-rn/sound @pixi/sound react-native-audio-api
+```
+
+```tsx
+import { sound, addSound, initAudio } from '@pixi-rn/sound';
+
+useEffect(() => {
+  initAudio();
+  void addSound('coin', require('./assets/coin.wav'));
+}, []);
+
+sound.play('coin');
+```
+
+Always import from `@pixi-rn/sound`, never `@pixi/sound` directly — this
+package re-exports everything it exports.
+
+<Callout type="warn" title="It is native code">
+  `react-native-audio-api` requires a development or EAS build. It cannot run in Expo Go and cannot reach a device over
+  OTA.
+</Callout>
+
+## Bring the engine up
+
+`initAudio()` belongs in an effect — never at module scope or in a render
+body. It's safe to call more than once and never throws:
+
+```tsx
+useEffect(() => {
+  if (!initAudio()) {
+    // fall back to a silent game — audio is an enhancement
+  }
+}, []);
+```
+
+It also claims the platform audio session (so the first cue isn't delayed),
+primes the graph, and binds `AppState` so playback pauses in the background
+and resumes on return.
+
+`soundDiagnostics()` returns `{ ready, lastError }` — useful when "there is no
+sound" and you need to tell "never initialised" apart from "initialised and
+something threw". `lastError: null` does not mean audio is actually audible;
+no platform reports that back.
+
+## Loading clips
+
+```tsx
+const coin = await addSound('coin', require('./assets/coin.wav'), { volume: 0.8 });
+coin.play();
+```
+
+`loadSounds` decodes a batch sequentially and returns whichever clips
+succeeded, skipping ones that fail to decode rather than failing the batch:
+
+```tsx
+const clips = await loadSounds(
+  { jump: require('./jump.wav'), coin: require('./coin.wav') },
+  { options: (name) => ({ volume: name === 'coin' ? 0.6 : 0.85, preload: true }) },
+);
+clips.jump?.play();
+```
+
+## Playback helpers
+
+**`throttle`** rate-limits a bursty one-shot cue:
+
+```tsx
+const playCoin = throttle(() => coin.play(), 90);
+for (const c of collectedThisFrame) playCoin();
+```
+
+**`TrackSwitcher`** swaps between named looping tracks — menu/level music, an
+ambience bed — pausing whichever one isn't current rather than destroying it:
+
+```tsx
+const music = new TrackSwitcher<'menu' | 'level'>();
+music.add('menu', menuTrack);
+music.add('level', levelTrack);
+
+music.play(inMenu ? 'menu' : 'level');
+music.setVolume(settings.musicVolume);
+```
+
+**`FilterGroup`** toggles a filter chain across a set of clips, building it
+once on first use:
+
+```tsx
+const caveEcho = new FilterGroup(() => [new filters.ReverbFilter(1.6, 2.5)]);
+caveEcho.add(jumpClip);
+caveEcho.add(footstepLoop);
+
+caveEcho.set(inCave);
+```
+
+All three are safe to call redundantly or every frame — they only reach the
+audio graph on an actual change.
+
+## Filters
+
+`filters` re-exports `@pixi/sound`'s own filters unchanged — `ReverbFilter`,
+`EqualizerFilter`, `DistortionFilter`, `StereoFilter`, `TelephoneFilter`,
+`MonoFilter`. Apply them per clip (`clip.filters = [...]`) rather than through
+`sound.filtersAll`, which is context-wide and reaches every other sound too,
+including music.
+
+## Known gaps
+
+- **No `DynamicsCompressorNode`.** `sound.context.compressor` is a unity-gain
+  passthrough — there is no master limiting, so many loud simultaneous
+  sources can clip where a browser wouldn't.
+- **`OfflineAudioContext` only implements `decodeAudioData`.** Construct
+  `react-native-audio-api`'s own for real offline rendering.
+- **`canPlayType()` always returns `''`.** There's no HTML `<audio>` here.
+
+## Relationship to `pixi-rn/audio`
+
+|                                      | `pixi-rn/audio` | `@pixi-rn/sound`         |
+| ------------------------------------ | --------------- | ------------------------ |
+| backend                              | `expo-audio`    | `react-native-audio-api` |
+| model                                | pooled players  | a real Web Audio graph   |
+| filters, sprites, per-instance pitch | no              | yes                      |
+| Expo Go                              | yes             | no                       |
+
+See the full API in the [reference](/docs/api/sound).

@@ -1,37 +1,21 @@
 ---
 title: Audio
-description: Pooled, pre-warmed expo-audio players — and why this isn't built on pixi's own @pixi/sound.
+description: Pooled, pre-warmed expo-audio players for a handful of clips fired cheaply.
 ---
 
-## Why not `@pixi/sound`
+`pixi-rn/audio` wraps `expo-audio` with a small pool of pre-warmed players per
+clip, so overlapping triggers each get their own instance instead of cutting
+each other off, and the native player construction cost lands ahead of time
+instead of stalling the first play.
 
-Pixi's own audio plugin is built entirely on the **Web Audio API**
-(`AudioContext`, `decodeAudioData`, `createBufferSource`) — none of which
-exist in Hermes/React Native, and nothing in Expo polyfills them. It's the
-same class of dead end as `@pixi/layout`'s Yoga/WASM dependency (see
-[Layout](/docs/concepts/layout)): the library assumes a browser API surface
-this platform doesn't have. `expo-audio` is the real native audio module
-here, so `pixi-rn`'s audio module wraps it instead of pixi's own.
+Want filters, sprites, per-instance pitch, or a full Web Audio graph instead?
+See [`@pixi-rn/sound`](/docs/concepts/sound) — a separate package, a different
+native backend (`react-native-audio-api`), no Expo Go support.
 
-<Callout title="Its own entry point, on purpose">
-  Every module that touches a native capability lives behind its own entry point rather than the package root — audio
-  here, and [haptics](/docs/concepts/haptics) likewise. Import it from `pixi-rn/audio`, and install `expo-audio`
-  alongside it (`npx expo install expo-audio`). A bundler resolves imports statically, so a root barrel that reached
-  `expo-audio` would force every consumer to install the native package merely to bundle anything at all, even an app
-  that never plays a sound. Keeping it behind its own entry point is what makes the dependency follow the feature.
+<Callout title="Its own entry point">
+  Import from `pixi-rn/audio`, and install `expo-audio` alongside it (`npx expo install expo-audio`) — it isn't part of
+  the package root, so nothing forces the native dependency on an app that never plays a sound.
 </Callout>
-
-## The two real failure modes
-
-Every native audio integration on this stack eventually hits the same two
-problems, independent of what game or app it's for:
-
-- A **shared player cuts itself off** when retriggered mid-clip — two
-  overlapping coin pickups sound wrong if they fight over one `AudioPlayer`.
-- **`createAudioPlayer()` is a synchronous native constructor** that loads
-  the asset and blocks the JS thread for tens of milliseconds on Android.
-  Call it lazily on first play and that stall lands mid-gameplay, at exactly
-  the moment a sound effect fires.
 
 ## `SoundPool` — one-shots
 

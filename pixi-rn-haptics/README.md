@@ -30,10 +30,11 @@ impactAsync(settings.vibration, 'heavy');
 > consumer's build whether or not they import it. No import boundary can prevent
 > that; a package boundary can.
 
-## Why this exists
+## Why this attaches `USAGE_MEDIA`
 
-Every JS-reachable way to vibrate an Android phone is silenced by the system's
-_haptic feedback_ level — a setting about UI touches:
+Every other JS-reachable way to vibrate an Android phone is silenced by the
+system's _haptic feedback_ level — a setting about UI touches — and none of
+them report a failure when suppressed:
 
 | approach                            | why it's gated                                      |
 | ----------------------------------- | --------------------------------------------------- |
@@ -41,11 +42,8 @@ _haptic feedback_ level — a setting about UI touches:
 | `Vibration.vibrate` (React Native)  | same — RN passes no `VibrationAttributes`           |
 | `performAndroidHapticsAsync`        | gated outright, and discards the boolean saying so  |
 
-Verified on a device with that level at 0: all three are silent, and none
-reports anything wrong. A game's collision cue is not UI touch feedback, and
-Android agrees — its settings screen carries an independent media-vibration
-level. This package's native side attaches `AudioAttributes.USAGE_MEDIA` and
-lands there instead.
+This package's native side attaches `AudioAttributes.USAGE_MEDIA` instead,
+which the haptic-feedback level does not gate.
 
 > [!WARNING]
 > This lets your app vibrate while the user has touch feedback switched off.

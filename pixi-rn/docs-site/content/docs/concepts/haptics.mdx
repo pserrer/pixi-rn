@@ -57,11 +57,11 @@ event handling, where awaiting a native round-trip would sit between the
 simulation step and the render; and a rejection (no vibrator, permission
 withheld) must never surface as an unhandled promise rejection.
 
-## Why this package exists at all
+## Why this attaches `USAGE_MEDIA`
 
-There are three ways to make an Android phone buzz from JS, and **all three are
-silenced by the same system setting** — the _haptic feedback_ level, which is a
-setting about UI touches:
+Android's system _haptic feedback_ level — a setting about UI touches, separate
+from its media-vibration level — silences every other JS-reachable way to
+vibrate the phone:
 
 | approach                                                   | amplitude          | suppressed by the haptic-feedback level |
 | ---------------------------------------------------------- | ------------------ | --------------------------------------- |
@@ -69,18 +69,10 @@ setting about UI touches:
 | `performAndroidHapticsAsync` (the haptic engine)           | the platform's own | **yes** (gated outright)                |
 | `Vibration.vibrate` (React Native core)                    | full               | **yes** (no usage attributes)           |
 
-Verified on a device with that level at 0: all three are inaudible, and **none
-of them reports anything wrong**. `View.performHapticFeedback` returns a boolean
-saying whether it performed and `expo-haptics` discards it, so the call resolves
-successfully having produced no vibration at all. Nothing observable from inside
-the app distinguishes that from a device with no vibrator — which is what makes
-this expensive to debug rather than merely annoying.
-
-A game's collision cue is not UI touch feedback, and Android agrees: its
-settings screen carries an independent media-vibration level. This package's
-native side attaches `AudioAttributes.USAGE_MEDIA` and lands there instead.
-**Verified on a device with haptic feedback set to 0: cues buzz, where all three
-JS paths are silent.**
+None of them report a failure when suppressed — a call simply produces no
+vibration, indistinguishable from a device with no vibrator. This package's
+native side attaches `AudioAttributes.USAGE_MEDIA` instead, which the
+haptic-feedback level does not gate.
 
 <Callout type="warn">
   This lets your app vibrate while the user has touch feedback switched off. Only ship it if you give the player their
@@ -125,5 +117,4 @@ and you need to separate "the app never asked" from "the app asked and something
 threw".
 
 ⚠️ Its `lastError: null` means **nothing threw**. It does not mean the device
-buzzed; no platform reports that back. Confusing the two is what turns a
-device-settings problem into five rounds of debugging your own code.
+buzzed; no platform reports that back.

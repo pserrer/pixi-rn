@@ -4,6 +4,22 @@ All notable changes to `@pixi-rn/sound` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-08-15
+
+### Added
+
+- `loadSounds(sources, options)` — decode a batch of clips sequentially and
+  return whichever succeeded, instead of every consumer hand-rolling the same
+  loop.
+- `throttle(fn, minGapMs)` — drop calls to a callback that land within
+  `minGapMs` of the last one that ran, for a one-shot cue bound to a bursty
+  event.
+- `TrackSwitcher` — switch between named looping tracks (menu/level music,
+  ambience beds), pausing rather than destroying whichever one isn't current.
+- `FilterGroup` — toggle a filter chain on or off across a set of clips,
+  building it once on first use and applying it to clips registered after the
+  toggle too.
+
 ## [0.2.2] - 2026-08-15
 
 ### Fixed

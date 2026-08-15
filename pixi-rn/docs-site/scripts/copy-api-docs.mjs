@@ -1,14 +1,15 @@
-// Turns pixi-rn's TypeDoc-generated markdown into native Fumadocs pages
+// Turns every package's TypeDoc-generated markdown into native Fumadocs pages
 // under content/docs/api/, so the API reference shares this site's own
 // layout, theme and sidebar instead of living as a disconnected raw-HTML
 // subtree (which is what public/api/ used to be, before this rewrite).
-// TypeDoc (via typedoc-plugin-markdown + typedoc-plugin-frontmatter, see
-// ../../typedoc.json) already emits Fumadocs-flavoured frontmatter; this
-// script's own job is the two things TypeDoc can't do for a destination it
-// doesn't know about: rewrite its relative `../foo/Bar.md`-style cross-links
-// into absolute `/docs/api/...` routes (Fumadocs pages don't live at the
-// file paths TypeDoc linked against), and add meta.json files for a nicer
-// sidebar than raw folder names like "type-aliases".
+// TypeDoc (via typedoc-plugin-markdown + typedoc-plugin-frontmatter, see each
+// package's own typedoc.json) already emits Fumadocs-flavoured frontmatter;
+// this script's own job is what TypeDoc can't do for a destination it doesn't
+// know about: regenerate each package's docs fresh, merge them into one tree,
+// rewrite relative `../foo/Bar.md`-style cross-links into absolute
+// `/docs/api/...` routes (Fumadocs pages don't live at the file paths TypeDoc
+// linked against), and add meta.json files for a nicer sidebar than raw
+// folder names like "type-aliases".
 import { existsSync, readdirSync, readFileSync, writeFileSync, statSync, cpSync, mkdirSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
@@ -17,21 +18,52 @@ import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DOCS_SITE_ROOT = path.resolve(HERE, '..');
 // This site lives INSIDE packages/pixi-rn (docs-site/) rather than beside it,
-// specifically so a prefix mirror of packages/pixi-rn into a separate public
-// repo carries the whole docs site along with it — do not move it back out.
+// specifically so a prefix mirror of packages/ into a separate public repo
+// carries the whole docs site along with it — do not move it back out.
 const PIXI_RN_ROOT = path.resolve(DOCS_SITE_ROOT, '..');
-const PIXI_RN_DOCS = path.join(PIXI_RN_ROOT, 'docs');
+const PACKAGES_ROOT = path.resolve(PIXI_RN_ROOT, '..');
 const DEST = path.join(DOCS_SITE_ROOT, 'content', 'docs', 'api');
 const BASE_ROUTE = '/docs/api';
 
-if (!existsSync(PIXI_RN_DOCS)) {
-  console.log('[copy-api-docs] pixi-rn/docs not found, generating it first…');
-  execFileSync('npm', ['run', 'docs'], { cwd: PIXI_RN_ROOT, stdio: 'inherit' });
-}
+// One entry per published package. `pixi-rn` has more than one entry point
+// (the root module plus `pixi-rn/audio`), so TypeDoc already splits its
+// output into one subfolder per module — those get merged straight into the
+// top of `api/`. A single-entry-point package's docs land directly at its
+// `docs/` root, so those need a `slug` to nest them under instead of
+// colliding with each other (every one of them would otherwise produce a
+// folder literally named `index`).
+const PACKAGES = [
+  { dir: PIXI_RN_ROOT, workspace: 'pixi-rn', slug: null },
+  { dir: path.join(PACKAGES_ROOT, 'pixi-rn-haptics'), workspace: '@pixi-rn/haptics', slug: 'haptics' },
+  { dir: path.join(PACKAGES_ROOT, 'pixi-rn-sound'), workspace: '@pixi-rn/sound', slug: 'sound' },
+];
+
+// The top-level folders are one per module a reader would actually import —
+// TypeDoc names a multi-entry-point package's folders after the source path
+// (`src/index.ts` → `index`); a single-entry-point package's slug (above) IS
+// its folder name. Title them by the import path, not the file layout — that
+// is what tells a reader where a symbol comes from.
+const MODULE_TITLES = {
+  index: 'pixi-rn',
+  audio: 'pixi-rn/audio',
+  haptics: '@pixi-rn/haptics',
+  sound: '@pixi-rn/sound',
+};
 
 rmSync(DEST, { recursive: true, force: true });
-mkdirSync(path.dirname(DEST), { recursive: true });
-cpSync(PIXI_RN_DOCS, DEST, { recursive: true });
+mkdirSync(DEST, { recursive: true });
+
+for (const { dir, workspace, slug } of PACKAGES) {
+  const docsDir = path.join(dir, 'docs');
+  // Always regenerate: a stale docs/ folder from a since-changed typedoc.json
+  // (e.g. an entry point that moved to another package) would otherwise be
+  // copied in verbatim and no one would notice.
+  rmSync(docsDir, { recursive: true, force: true });
+  execFileSync('npm', ['run', 'docs', '--workspace', workspace], { cwd: PACKAGES_ROOT, stdio: 'inherit' });
+  const dest = slug ? path.join(DEST, slug) : DEST;
+  mkdirSync(dest, { recursive: true });
+  cpSync(docsDir, dest, { recursive: true });
+}
 
 function walk(dir) {
   const out = [];
@@ -45,7 +77,7 @@ function walk(dir) {
 
 // typedoc-plugin-markdown's entry page for any folder is README.md; Fumadocs
 // wants an index page instead, so a folder's own landing ROUTE resolves. With
-// one entry point per package subpath there is one of these per module, not
+// one entry point per package/subpath there is one of these per module, not
 // just at the top — so this walks, rather than special-casing the root.
 function readmesToIndexes(dir) {
   const readme = path.join(dir, 'README.md');
@@ -80,13 +112,11 @@ for (const file of files) {
   writeFileSync(file, content);
 }
 
-writeFileSync(path.join(DEST, 'meta.json'), JSON.stringify({ title: 'API Reference' }, null, 2) + '\n');
+writeFileSync(
+  path.join(DEST, 'meta.json'),
+  JSON.stringify({ title: 'API Reference', pages: ['index', 'audio', 'haptics', 'sound'] }, null, 2) + '\n',
+);
 const titleCase = (s) => s.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-// The top-level folders are one per ENTRY POINT, and TypeDoc names them after
-// the source path (`src/index.ts` → `index`). Title them by the import path a
-// reader would actually write instead — that, not the file layout, is what
-// tells them where a symbol comes from.
-const MODULE_TITLES = { index: 'pixi-rn', audio: 'pixi-rn/audio' };
 for (const entry of readdirSync(DEST)) {
   const full = path.join(DEST, entry);
   if (!statSync(full).isDirectory()) continue;
