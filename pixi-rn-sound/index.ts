@@ -1,16 +1,17 @@
 // `@pixi/sound` on React Native, backed by `react-native-audio-api`.
 //
-// The import order below is the entire point of this package: the shim installs
-// the Web Audio globals, and only then is `@pixi/sound` allowed to evaluate.
-// Within one module ES evaluation order follows source order, so this is
-// guaranteed — do not reorder these two lines, and do not let a bundler-visible
-// import of `@pixi/sound` appear above the shim anywhere in the graph.
+// Importing this package is INERT — it installs a few pure-JS DOM stubs and
+// nothing else. Native code is first touched by `initAudio()`, which a host
+// calls from an effect. That is what makes a plain `import` safe here; see
+// shim.ts for the two module-scope hazards it is dodging.
+//
+// The import order below is load-bearing: the stubs must exist before
+// `@pixi/sound` evaluates, since it reads `document` at module scope. Within a
+// module, ES evaluation order follows source order — do not reorder these.
 import './shim';
 
 export * from '@pixi/sound';
 export { addSound, type SoundSource } from './load';
-
-// Re-exported so a host has one import for the whole audio surface, and never
-// has to reach past this package into the backend.
-export { decodeAudioData, AudioManager } from 'react-native-audio-api';
+export { initAudio, audioManager, soundDiagnostics } from './init';
+export { installWebAudioGlobals, nativeAudio } from './shim';
 export { sound as default } from '@pixi/sound';

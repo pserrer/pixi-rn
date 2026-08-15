@@ -1,5 +1,5 @@
 import { sound, Sound, type Options } from '@pixi/sound';
-import { decodeAudioData } from 'react-native-audio-api';
+import { nativeAudio } from './shim';
 
 /** What `require('./clip.wav')` evaluates to in React Native (an asset id), a
  *  file/remote URI, or already-decoded bytes. */
@@ -24,7 +24,9 @@ export type SoundSource = number | string | ArrayBuffer;
  * minutes-long music track costs tens of MB, so measure before loading one.
  */
 export async function addSound(alias: string, source: SoundSource, options?: Options): Promise<Sound> {
-  const buffer = await decodeAudioData(source);
+  const rn = nativeAudio();
+  if (!rn) throw new Error('@pixi-rn/sound: no audio backend — the native side is not in this build');
+  const buffer = await rn.decodeAudioData(source);
   if (!buffer) throw new Error(`@pixi-rn/sound: could not decode "${alias}"`);
   return sound.add(alias, { ...options, source: buffer });
 }

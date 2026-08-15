@@ -4,6 +4,52 @@ All notable changes to `@pixi-rn/sound` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-08-15
+
+### Changed
+
+- **Importing this package is now inert, so a plain `import` is safe.**
+  Previously the shim installed the Web Audio globals at import, which made
+  `@pixi/sound`'s module-scope `new SoundLibrary()` see `supported === true` and
+  construct a real `AudioContext` during BUNDLE EVALUATION — before React
+  renders and before any error boundary exists. In the game this package was
+  built for, that killed the app on launch with a blank screen and nothing in
+  the JS logs. Consumers had to `require()` the package from inside an effect to
+  avoid it.
+
+  Only the pure-JS DOM stubs run at import now. The native half moved behind
+  **`initAudio()`**, which a host calls from an effect.
+
+- `react-native-audio-api` is `require`d lazily rather than imported: its module
+  constructor runs `NativeAudioAPIModule.install()` and throws when the native
+  module is missing, so a static import made merely importing this package fatal
+  on a binary without it. Confined to one place here so no consumer repeats it.
+
+- **`OfflineAudioContext` is an adapter, not the real class.**
+  `WebAudioContext`'s constructor builds one unconditionally — a two-sample
+  context — and uses it for exactly one thing, `decodeAudioData`. In a browser
+  that is free. Here its constructor calls `createAudioRuntime()`, which does
+  `createWorkletRuntime('AudioWorkletRuntime')`, so the live `AudioContext`
+  built one line earlier and this one both spin up a Reanimated worklet
+  runtime, **under the same name, milliseconds apart, at startup**. The
+  stand-in provides the one method actually used, backed by the same native
+  decoder, and creates no second runtime.
+
+- `initAudio()` **never throws** and returns whether audio came up; a host that
+  gets `false` should carry on without sound. Audio is an enhancement, and
+  context construction reaches far enough into the platform that it must be
+  allowed to fail.
+
+### Added
+
+- `initAudio()`, `audioManager()`, `soundDiagnostics()`,
+  `installWebAudioGlobals()`, `nativeAudio()`.
+
+### Migrating from 0.1.0
+
+Call `initAudio()` in an effect before loading anything, and replace any
+defensive `require('@pixi-rn/sound')` with an ordinary import.
+
 ## [0.1.0] - 2026-08-14
 
 ### Added

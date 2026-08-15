@@ -40,39 +40,65 @@ module, ES evaluation order follows source order, so that ordering is guaranteed
 `import '@pixi/sound'` anywhere in your graph can still evaluate first and
 throw.
 
-## ⚠️ Import it lazily, not at module scope
+## Bring it up from an effect
 
-`@pixi/sound` builds its `sound` singleton as the **last statement of its
-module**, and that constructor constructs a real `AudioContext` — plus an
-`OfflineAudioContext`, a compressor and an analyser. On React Native those are
-native calls, so a static `import` starts the audio engine during **bundle
-evaluation**: before React renders, before any error boundary exists.
-
-In this game that tore the app down with nothing on screen and nothing in the
-JS logs. Require it from inside an effect instead:
+Importing this package is **inert** — it installs a few pure-JS DOM stubs and
+touches nothing native. `initAudio()` is what starts the engine, and it belongs
+in an effect:
 
 ```ts
+import { sound, addSound, initAudio } from '@pixi-rn/sound';
+
 useEffect(() => {
-  const { sound, addSound } = require('@pixi-rn/sound') as typeof import('@pixi-rn/sound');
-  // ...
+  initAudio();
+  void addSound('coin', require('./assets/coin.wav'));
 }, []);
 ```
 
-A type-only `import type { Sound } from '@pixi-rn/sound'` is free — it is
-erased at compile time and never reaches the bundle.
+That ordering is not a style preference. Two things would otherwise run native
+code during **bundle evaluation** — before React renders, before any error
+boundary exists, where a failure is a silent tear-down with nothing in the JS
+logs:
+
+- `@pixi/sound` builds its `sound` singleton as the last statement of its
+  module, and that constructor builds a real `AudioContext` — but only
+  `if (this.supported)`, which is `window.AudioContext !== null`. Leaving the
+  globals out until `initAudio()` makes that branch skip.
+- Importing `react-native-audio-api` runs `NativeAudioAPIModule.install()` in a
+  module-scope constructor, and **throws** if the native module is absent. This
+  package `require()`s it lazily for that reason — one place, so no consumer has
+  to.
 
 ## What is shimmed
 
 | global                                | backed by                                      |
 | ------------------------------------- | ---------------------------------------------- |
 | `AudioContext`, `window.AudioContext` | `react-native-audio-api`, plus one patch below |
-| `OfflineAudioContext`                 | `react-native-audio-api`                       |
+| `OfflineAudioContext`                 | a decode-only adapter — see below              |
 | `AudioBuffer`                         | `react-native-audio-api`                       |
 | `HTMLAudioElement`                    | empty class — only an `instanceof` target      |
 | `document.createElement('audio')`     | stub whose `canPlayType` returns `''`          |
 
 `canPlayType` reporting nothing is accurate — there is no HTML audio here — and
 it is what keeps `@pixi/sound` on its WebAudio path instead of the legacy one.
+
+## Why `OfflineAudioContext` is an adapter
+
+`WebAudioContext`'s constructor builds one unconditionally — `new
+OfflineAudioContext(1, 2, sampleRate)`, a **two-sample** context — and uses it
+for exactly one thing: `decodeAudioData`.
+
+In a browser that costs nothing. Here, `OfflineAudioContext`'s constructor calls
+`AudioAPIModule.createAudioRuntime()` → `createWorkletRuntime('AudioWorkletRuntime')`.
+The live `AudioContext` built one line earlier does the same. So the real class
+means **two Reanimated worklet runtimes under the same name, milliseconds apart,
+during startup** — something a browser never does, and a good way to die without
+a JS exception.
+
+The stand-in provides the one method actually used, backed by the same native
+decoder `addSound` uses, and creates no second runtime. Anything that genuinely
+needs offline _rendering_ should construct a real one deliberately, after
+startup.
 
 ## The one real gap: no dynamics compressor
 
