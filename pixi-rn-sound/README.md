@@ -40,6 +40,27 @@ module, ES evaluation order follows source order, so that ordering is guaranteed
 `import '@pixi/sound'` anywhere in your graph can still evaluate first and
 throw.
 
+## ⚠️ Import it lazily, not at module scope
+
+`@pixi/sound` builds its `sound` singleton as the **last statement of its
+module**, and that constructor constructs a real `AudioContext` — plus an
+`OfflineAudioContext`, a compressor and an analyser. On React Native those are
+native calls, so a static `import` starts the audio engine during **bundle
+evaluation**: before React renders, before any error boundary exists.
+
+In this game that tore the app down with nothing on screen and nothing in the
+JS logs. Require it from inside an effect instead:
+
+```ts
+useEffect(() => {
+  const { sound, addSound } = require('@pixi-rn/sound') as typeof import('@pixi-rn/sound');
+  // ...
+}, []);
+```
+
+A type-only `import type { Sound } from '@pixi-rn/sound'` is free — it is
+erased at compile time and never reaches the bundle.
+
 ## What is shimmed
 
 | global                                | backed by                                      |
