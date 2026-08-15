@@ -4,6 +4,23 @@ All notable changes to `@pixi-rn/sound` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] - 2026-08-15
+
+### Fixed
+
+- **Cues were audible about a second late.** Two causes, both of them things
+  this environment silently skips:
+
+  - `react-native-audio-api` exposes `setAudioSessionActivity` and never calls
+    it, so nothing held the platform audio session and the output stream was
+    acquired lazily. `initAudio()` now claims it.
+  - `@pixi/sound` warms the graph with a one-sample silent buffer from its
+    autoplay-unlock path, gated on `_locked`, which it computes as
+    `state === 'suspended' && ('ontouchstart' in globalThis || 'onclick' in
+globalThis)`. React Native has neither, so `_locked` is always false and the
+    warm-up was dead code here. `initAudio()` now calls `playEmptySound()`
+    directly, which also resumes a context that started suspended.
+
 ## [0.2.0] - 2026-08-15
 
 ### Changed

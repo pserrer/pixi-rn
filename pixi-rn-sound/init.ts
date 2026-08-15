@@ -39,6 +39,28 @@ export function initAudio(): boolean {
       return false;
     }
     sound.init();
+
+    // Hold the platform audio session. `react-native-audio-api` exposes this
+    // and never calls it itself, and neither did we — so the output stream was
+    // being acquired lazily (on Android, audio focus), which shows up as a long
+    // delay before the first cue is audible. Fire-and-forget: it returns a
+    // promise, and failing to get the session must not fail init.
+    void nativeAudio()
+      ?.AudioManager.setAudioSessionActivity(true)
+      .catch(() => {});
+
+    // Prime the graph with a one-sample silent buffer, and resume the context
+    // if it started suspended.
+    //
+    // `@pixi/sound` has this exact primitive and normally runs it from its
+    // autoplay-unlock path — but that path is gated on `_locked`, which it
+    // computes as `state === 'suspended' && ('ontouchstart' in globalThis ||
+    // 'onclick' in globalThis)`. React Native has neither, so `_locked` is
+    // always false and the warm-up never fires. Calling it directly is what
+    // makes the FIRST play cost the same as every later one.
+    const ctx = sound.context as unknown as { playEmptySound?: () => void };
+    ctx.playEmptySound?.();
+
     ready = true;
     return true;
   } catch (err) {
