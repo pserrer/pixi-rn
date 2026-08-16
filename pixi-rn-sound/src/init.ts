@@ -5,6 +5,12 @@ import { installWebAudioGlobals, nativeAudio, nativeAudioError } from './shim';
 let lastError: string | null = null;
 let ready = false;
 let appStateSub: NativeEventSubscription | null = null;
+let backgroundedAt: number | null = null;
+
+// A background gap past this is treated as a suspension long enough for the
+// OS to have reclaimed the native audio session (locked-screen "deep sleep"),
+// not an ordinary app-switch or notification-shade glance — see reviveOnResume.
+const LONG_BACKGROUND_MS = 60_000;
 
 /**
  * Stop audio while the app is backgrounded, and pick it up again on return.
@@ -15,26 +21,70 @@ let appStateSub: NativeEventSubscription | null = null;
  * on over the home screen unless something else stops it. `AppState` is the
  * platform's version of the same signal.
  *
- * Driving `context.paused` rather than `pauseAll()` is deliberate: the setter
- * suspends the whole `AudioContext`, so nothing keeps rendering while
- * backgrounded, and `refreshPaused()` propagates it to live instances.
+ * `sound.stopAll()` runs FIRST, before suspending the context — not merely
+ * "belt and suspenders" with `context.paused`. `@pixi/sound`'s pause model is
+ * REPLAY-based: `WebAudioInstance.refreshPaused()` computes `pausedReal =
+ * this._paused || sound.paused || global.paused`, and a transition from
+ * paused back to un-paused calls `this.play({ start: this._elapsed % ...
+ * })` — i.e. resuming ANY still-live instance means playing it again. Context-
+ * level pause (`global.paused`) touches every instance of every Sound, and a
+ * one-shot SFX has no OTHER paused flag keeping it paused once that clears —
+ * unlike this game's music tracks, which stay silent across a resume because
+ * `useMusic` independently calls `Sound.pause()` itself (setting the
+ * PER-SOUND `sound.paused`, which survives the context flag clearing). A one-
+ * shot SFX still in `_instances` at background time — anything played in the
+ * last moment before switching apps, since an `AudioBufferSourceNode` isn't
+ * pooled until it fires `onended` — would otherwise REPLAY itself the instant
+ * the app came back, with no trigger from the game at all. `stopAll()` routes
+ * through every instance's real `stop()` (not the internal one `refreshPaused`
+ * uses), which pools it properly and leaves nothing to resume.
  *
  * iOS reports `inactive` for transient interruptions (the app switcher, a
  * notification shade). A game should go quiet for those too, so anything that
  * is not `active` counts as backgrounded.
+ *
+ * ⚠️ A background gap long enough for the OS to reclaim the native audio
+ * session (a locked screen left for minutes/hours) leaves `paused = false`
+ * un-pausing a session that is no longer actually there — the platform never
+ * tells JS this happened, so nothing here can detect it directly. On a LONG
+ * resume, {@link reviveOnResume} re-asserts the session and re-primes the
+ * graph rather than trusting the context is still the one that was built.
  */
 function bindAppState(): void {
   if (appStateSub) return;
   const ctx = sound.context as unknown as { paused: boolean; refreshPaused?: () => void };
   const apply = (state: AppStateStatus) => {
     try {
-      ctx.paused = state !== 'active';
+      if (state !== 'active') {
+        backgroundedAt = Date.now();
+        sound.stopAll();
+        ctx.paused = true;
+        ctx.refreshPaused?.();
+        return;
+      }
+      const gap = backgroundedAt !== null ? Date.now() - backgroundedAt : 0;
+      backgroundedAt = null;
+      ctx.paused = false;
       ctx.refreshPaused?.();
+      if (gap >= LONG_BACKGROUND_MS) reviveOnResume();
     } catch {
       // Backgrounding must never be able to throw into the host.
     }
   };
   appStateSub = AppState.addEventListener('change', apply);
+}
+
+/**
+ * Re-assert the audio session and re-prime the graph — the same two calls
+ * {@link initAudio} makes on first bring-up. Cheap and safe to repeat on a
+ * context that never actually died; the point is the case where it did.
+ */
+function reviveOnResume(): void {
+  void nativeAudio()
+    ?.AudioManager.setAudioSessionActivity(true)
+    .catch(() => {});
+  const ctx = sound.context as unknown as { playEmptySound?: () => void };
+  ctx.playEmptySound?.();
 }
 
 /**

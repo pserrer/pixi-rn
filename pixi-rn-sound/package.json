@@ -1,6 +1,6 @@
 {
   "name": "@pixi-rn/sound",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "@pixi/sound on React Native, backed by react-native-audio-api \u2014 the real Web Audio graph, filters and all.",
   "license": "MIT",
   "publishConfig": {

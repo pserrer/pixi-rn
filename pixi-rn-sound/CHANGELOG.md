@@ -4,6 +4,33 @@ All notable changes to `@pixi-rn/sound` are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 follows [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-08-15
+
+### Fixed
+
+- **A one-shot cue still playing (or not yet pooled — an
+  `AudioBufferSourceNode` isn't cleaned up until it fires `onended`) at the
+  moment the app backgrounds would replay itself the instant the app came
+  back, with nothing in the game re-triggering it.** `@pixi/sound`'s pause
+  model is replay-based: resuming any still-live instance calls `play()`
+  again from its elapsed position. Toggling `context.paused` (the only
+  option available, since `@pixi/sound`'s own `autoPause` never fires in
+  React Native) touches every instance of every registered `Sound`, and a
+  one-shot effect has no other paused flag keeping it paused once that
+  clears — unlike a track a host explicitly calls `Sound.pause()` on, whose
+  per-`Sound` paused flag survives the context flag clearing. Backgrounding
+  now calls `sound.stopAll()` before suspending the context, which routes
+  through every instance's real `stop()` and leaves nothing to resume.
+- **Resuming after a long background suspension could leave audio
+  permanently silent.** `initAudio()` is a one-time call, and the `AppState`
+  handler only toggled `context.paused` on foreground/background — correct
+  for a quick app-switch, but a background gap long enough for the OS to
+  reclaim the native audio session (a locked screen left for minutes or
+  hours) left nothing to re-assert it, since the platform never tells JS
+  that happened. A resume after 60+ seconds backgrounded now re-claims the
+  audio session and re-primes the graph, the same two calls `initAudio()`
+  makes on first bring-up.
+
 ## [0.4.0] - 2026-08-15
 
 ### Changed
